@@ -5,7 +5,6 @@
       <module fileurl="file://$PROJECT_DIR$/VisionTest.iml" filepath="$PROJECT_DIR$/VisionTest.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
       <module fileurl="file://$PROJECT_DIR$/ntcore/ntcore.iml" filepath="$PROJECT_DIR$/ntcore/ntcore.iml" />
-      <module fileurl="file://$PROJECT_DIR$/ntcore2/ntcore2.iml" filepath="$PROJECT_DIR$/ntcore2/ntcore2.iml" />
       <module fileurl="file://$PROJECT_DIR$/openCVLibrary310/openCVLibrary310.iml" filepath="$PROJECT_DIR$/openCVLibrary310/openCVLibrary310.iml" />
     </modules>
   </component>
