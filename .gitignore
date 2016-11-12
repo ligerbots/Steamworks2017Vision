@@ -1,0 +1,14 @@
+.gradle
+/local.properties
+/.idea/workspace.xml
+/.idea/libraries
+.DS_Store
+/build
+
+/captures
+/openCVLibrary310/build
+/app/build
+/ntcore/build
+/ntcore/.externalNativeBuild
+
+/libstreaming
