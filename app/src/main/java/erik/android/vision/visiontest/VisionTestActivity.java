@@ -18,6 +18,7 @@ import org.opencv.calib3d.Calib3d;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfByte;
 import org.opencv.core.MatOfDouble;
 import org.opencv.core.MatOfInt;
 import org.opencv.core.MatOfPoint;
@@ -31,6 +32,10 @@ import org.opencv.imgproc.Imgproc;
 import org.opencv.imgproc.Moments;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -38,11 +43,16 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
+import edu.wpi.first.wpilibj.networktables.NetworkTable;
 import erik.android.vision.visiontest.calibration.CalibrationResult;
 import erik.android.vision.visiontest.calibration.CameraCalibrationActivity;
 
 public class VisionTestActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2 {
     public static final String TAG = "VisionTestActivity";
+    public static final int CS_CONTROL_PORT = 5809;
+    public static final int CS_STREAM_PORT = 5810;
+    public static final byte[] CS_MAGIC_NUMBER = new byte[]{1, 0, 0, 0};
+    public static InetAddress CS_BROADCAST_ADDRESS;
 
     static {
         if (!OpenCVLoader.initDebug()) {
@@ -51,6 +61,8 @@ public class VisionTestActivity extends AppCompatActivity implements CameraBridg
     }
 
     private CameraBridgeViewBase mOpenCvCameraView;
+    private DatagramSocket udpCameraServerSocket;
+    private long lastSendTime = 0;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -62,6 +74,21 @@ public class VisionTestActivity extends AppCompatActivity implements CameraBridg
         mOpenCvCameraView.setMaxFrameSize(480, 360);
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
         mOpenCvCameraView.setCvCameraViewListener(this);
+
+        NetworkTable.setClientMode();
+        NetworkTable.setDSClientEnabled(false);
+        NetworkTable.setIPAddress("Erik-PC");
+        NetworkTable.initialize();
+        NetworkTable.getTable("/").putString("AndroidStatus", "Hello, World!");
+
+        try {
+            CS_BROADCAST_ADDRESS = InetAddress.getByName("255.255.255.255");
+            udpCameraServerSocket = new DatagramSocket(CS_CONTROL_PORT);
+            udpCameraServerSocket.setReuseAddress(true);
+            udpCameraServerSocket.setBroadcast(true);
+        } catch(Exception e) {
+            Log.e(TAG, "UDP error", e);
+        }
     }
 
     @Override
@@ -103,6 +130,8 @@ public class VisionTestActivity extends AppCompatActivity implements CameraBridg
         super.onDestroy();
         if (mOpenCvCameraView != null)
             mOpenCvCameraView.disableView();
+
+        NetworkTable.shutdown();
     }
 
     Scalar markColor1, markColor2;
@@ -352,11 +381,44 @@ public class VisionTestActivity extends AppCompatActivity implements CameraBridg
                 }
             }
             Imgproc.putText(originalFrame, Arrays.toString(pixel), touch, Core.FONT_HERSHEY_PLAIN, 1, markColor2);
-            String status = "Ready";;
+            String status = "Ready";
             if(cameraMatrix == null || distortCoeff == null){
                 status = "No calibration parameters";
             }
+            status += " | ";
+            if(NetworkTable.connections().length > 0) {
+                status += "NT connected";
+            } else {
+                status += "NT not connected";
+            }
             Imgproc.putText(originalFrame, status, new Point(0, 10), Core.FONT_HERSHEY_PLAIN, 1, markColor2);
+        }
+
+        if(System.currentTimeMillis() - lastSendTime > 100) {
+            MatOfByte output = new MatOfByte();
+            Mat copyFrame = new Mat();
+            Imgproc.cvtColor(originalFrame, copyFrame, Imgproc.COLOR_RGBA2BGR);
+            Imgcodecs.imencode(".jpg", copyFrame, output);
+            byte[] data = output.toArray();
+            int length = data.length;
+            byte[] lengthByte = new byte[]{
+                    (byte) (length >>> 24),
+                    (byte) (length >>> 16),
+                    (byte) (length >>> 8),
+                    (byte) (length)
+            };
+            byte[] packet = new byte[data.length + lengthByte.length + CS_MAGIC_NUMBER.length];
+            System.arraycopy(CS_MAGIC_NUMBER, 0, packet, 0, CS_MAGIC_NUMBER.length);
+            System.arraycopy(lengthByte, 0, packet, CS_MAGIC_NUMBER.length, lengthByte.length);
+            System.arraycopy(data, 0, packet, CS_MAGIC_NUMBER.length + lengthByte.length, data.length);
+            DatagramPacket pkt = new DatagramPacket(packet, packet.length, CS_BROADCAST_ADDRESS, CS_STREAM_PORT);
+            try {
+                udpCameraServerSocket.send(pkt);
+            } catch (IOException e) {
+                Log.e(TAG, "UDP send error", e);
+            }
+
+            lastSendTime = System.currentTimeMillis();
         }
 
         return originalFrame;

@@ -8,3 +8,7 @@
 /captures
 /openCVLibrary310/build
 /app/build
+/ntcore/build
+/ntcore/.externalNativeBuild
+
+/libstreaming

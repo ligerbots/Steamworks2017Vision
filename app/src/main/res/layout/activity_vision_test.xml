@@ -44,9 +44,9 @@
         android:layout_height="fill_parent"
         android:id="@+id/HelloOpenCvView"
         android:visibility="gone"
-        opencv:show_fps="true"
-        opencv:camera_id="any"
         android:layout_below="@+id/seekBar"
-        android:layout_alignParentStart="true" />
+        android:layout_alignParentStart="true"
+        opencv:show_fps="true"
+        opencv:camera_id="any" />
 
 </RelativeLayout>
