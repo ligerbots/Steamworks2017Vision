@@ -1,4 +1,5 @@
 #include <jni.h>
+#include <opencv2/opencv.hpp>
 
 #ifdef __cplusplus
 extern "C" {
@@ -11,6 +12,7 @@ extern "C" {
  */
 JNIEXPORT jstring JNICALL Java_org_ffmpeg_FfmpegJNI_helloWorldJNI
         (JNIEnv * env, jclass type){
+    cv::Mat m;
     return env->NewStringUTF("Hello world from JNI!");
 }
 

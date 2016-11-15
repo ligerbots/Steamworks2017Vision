@@ -10,5 +10,7 @@
 /app/build
 /ntcore/build
 /ntcore/.externalNativeBuild
+/app-native/build
+/app-native/.externalNativeBuild
 
 /libstreaming
