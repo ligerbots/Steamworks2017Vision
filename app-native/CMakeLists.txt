@@ -16,23 +16,6 @@ add_library( app-native
 find_library( log-lib
               log )
 
-# add ffmpeg libs
-add_library( libavcodec
-             SHARED
-             IMPORTED )
-
-set_target_properties( libavcodec
-                       PROPERTIES IMPORTED_LOCATION
-                       ${CMAKE_SOURCE_DIR}/src/main/lib/libavcodec-57.so )
-
-add_library( libavformat
-             SHARED
-             IMPORTED )
-
-set_target_properties( libavformat
-                       PROPERTIES IMPORTED_LOCATION
-                       ${CMAKE_SOURCE_DIR}/src/main/lib/libavformat-57.so )
-
 # add opencv
 add_library( libopencv_java3
              SHARED
@@ -44,4 +27,4 @@ set_target_properties( libopencv_java3
 
 # link everything
 target_link_libraries( app-native
-                       ${log-lib} libavcodec libavformat libopencv_java3 )
+                       ${log-lib} libopencv_java3 )

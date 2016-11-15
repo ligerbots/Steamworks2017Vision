@@ -48,6 +48,7 @@ import java.util.concurrent.TimeUnit;
 
 import edu.wpi.first.wpilibj.tables.ITable;
 import edu.wpi.first.wpilibj.tables.ITableListener;
+import erik.android.vision.visiontest_native.AppNative;
 
 public class Camera2Activity extends AppCompatActivity {
 
@@ -255,6 +256,8 @@ public class Camera2Activity extends AppCompatActivity {
         mTextureView = (AutoFitTextureView) findViewById(R.id.textureView);
 
         NTClient.initNetworkTables();
+
+        Log.i(TAG, "Got string: " + AppNative.helloWorldJni());
     }
 
     @Override

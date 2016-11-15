@@ -9,7 +9,6 @@ import android.view.MotionEvent;
 import android.view.SurfaceView;
 import android.view.WindowManager;
 
-import org.ffmpeg.FfmpegJNI;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.calib3d.Calib3d;
@@ -48,6 +47,7 @@ import edu.wpi.first.wpilibj.networktables.NetworkTable;
 import edu.wpi.first.wpilibj.tables.ITable;
 import edu.wpi.first.wpilibj.tables.ITableListener;
 import erik.android.vision.visiontest.calibration.CalibrationResult;
+import erik.android.vision.visiontest_native.AppNative;
 
 public class VisionTestActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2 {
     public static final String TAG = "VisionTestActivity";
@@ -71,7 +71,6 @@ public class VisionTestActivity extends AppCompatActivity implements CameraBridg
     public void onCreate(Bundle savedInstanceState) {
         Log.i(TAG, "called onCreate");
         super.onCreate(savedInstanceState);
-        Log.i(TAG, "Got string: " + FfmpegJNI.helloWorldJNI());
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_vision_test);
         mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.HelloOpenCvView);
