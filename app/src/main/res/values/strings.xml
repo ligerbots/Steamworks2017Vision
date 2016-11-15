@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">Vision Test</string>
+    <string name="calibration_app_name">Calibration</string>
     <string name="saveText">Save Picture</string>
     <string name="openCalib">Calibrate&#8230;</string>
 

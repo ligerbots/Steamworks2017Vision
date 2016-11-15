@@ -7,11 +7,14 @@ import android.content.DialogInterface;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.WindowManager;
 
 import org.opencv.R;
 import org.opencv.core.Mat;
@@ -57,6 +60,7 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
 
     // XXX-ADDED
     protected Rect src, dst;
+    protected WindowManager windowManager;
 
     public CameraBridgeViewBase(Context context, int cameraId) {
         super(context);
@@ -64,6 +68,7 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
         getHolder().addCallback(this);
         mMaxWidth = MAX_UNSPECIFIED;
         mMaxHeight = MAX_UNSPECIFIED;
+        windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
     }
 
     public CameraBridgeViewBase(Context context, AttributeSet attrs) {
@@ -82,6 +87,7 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
         mMaxWidth = MAX_UNSPECIFIED;
         mMaxHeight = MAX_UNSPECIFIED;
         styledAttrs.recycle();
+        windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
     }
 
     /**
@@ -447,18 +453,50 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
             }
         }
 
+        // find and replace the existing 'if' body with this one:
         if (bmpValid && mCacheBitmap != null) {
             if (canvas != null) {
                 canvas.drawColor(0, android.graphics.PorterDuff.Mode.CLEAR);
+                int rotation = windowManager.getDefaultDisplay().getRotation();
+                int degrees = 0;
+                // config degrees as you need
+                Log.i(TAG, "Rotation: " + rotation);
+                switch (rotation) {
+                    case Surface.ROTATION_0:
+                        degrees = 90;
+                        break;
+                    case Surface.ROTATION_90:
+                        break;
+                    case Surface.ROTATION_180:
+                        break;
+                    case Surface.ROTATION_270:
+                        degrees = 180;
+                        break;
+                }
+
+                Matrix matrix = new Matrix();
+                matrix.postRotate(degrees);
+                Bitmap outputBitmap = Bitmap.createBitmap(mCacheBitmap, 0, 0, mCacheBitmap.getWidth(), mCacheBitmap.getHeight(), matrix, true);
+
+                if (outputBitmap.getWidth() <= canvas.getWidth()) {
+                    mScale = getRatio(outputBitmap.getWidth(), outputBitmap.getHeight(), canvas.getWidth(), canvas.getHeight());
+                } else {
+                    mScale = getRatio(canvas.getWidth(), canvas.getHeight(), outputBitmap.getWidth(), outputBitmap.getHeight());
+                }
+
+                if (mScale != 0) {
+                    canvas.scale(mScale, mScale, 0, 0);
+                }
                 Log.d(TAG, "mStretch value: " + mScale);
 
-                canvas.drawBitmap(mCacheBitmap, src, dst, null);
+                canvas.drawBitmap(outputBitmap, 0, 0, null);
 
                 if (mFpsMeter != null) {
                     mFpsMeter.measure();
                     mFpsMeter.draw(canvas, 20, 30);
                 }
                 getHolder().unlockCanvasAndPost(canvas);
+
             }
         }
     }
@@ -522,5 +560,13 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
         }
 
         return new Size(calcWidth, calcHeight);
+    }
+
+    private float getRatio(int widthSource, int heightSource, int widthTarget, int heightTarget) {
+        if (widthTarget <= heightTarget) {
+            return (float) heightTarget / (float) heightSource;
+        } else {
+            return (float) widthTarget / (float) widthSource;
+        }
     }
 }

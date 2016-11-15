@@ -1,6 +1,5 @@
 package erik.android.vision.visiontest;
 
-import android.content.Intent;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Environment;
@@ -8,10 +7,9 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.SurfaceView;
-import android.view.View;
 import android.view.WindowManager;
-import android.widget.SeekBar;
 
+import org.ffmpeg.FfmpegJNI;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.calib3d.Calib3d;
@@ -36,23 +34,27 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.InterfaceAddress;
+import java.net.NetworkInterface;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Locale;
 
 import edu.wpi.first.wpilibj.networktables.NetworkTable;
+import edu.wpi.first.wpilibj.tables.ITable;
+import edu.wpi.first.wpilibj.tables.ITableListener;
 import erik.android.vision.visiontest.calibration.CalibrationResult;
-import erik.android.vision.visiontest.calibration.CameraCalibrationActivity;
 
 public class VisionTestActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2 {
     public static final String TAG = "VisionTestActivity";
     public static final int CS_CONTROL_PORT = 5809;
     public static final int CS_STREAM_PORT = 5810;
     public static final byte[] CS_MAGIC_NUMBER = new byte[]{1, 0, 0, 0};
-    public static InetAddress CS_BROADCAST_ADDRESS;
+    public static InetAddress CS_BROADCAST_ADDRESS = null;
 
     static {
         if (!OpenCVLoader.initDebug()) {
@@ -63,31 +65,67 @@ public class VisionTestActivity extends AppCompatActivity implements CameraBridg
     private CameraBridgeViewBase mOpenCvCameraView;
     private DatagramSocket udpCameraServerSocket;
     private long lastSendTime = 0;
+    private NetworkTable networkTable;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         Log.i(TAG, "called onCreate");
         super.onCreate(savedInstanceState);
+        Log.i(TAG, "Got string: " + FfmpegJNI.helloWorldJNI());
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_vision_test);
         mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.HelloOpenCvView);
-        mOpenCvCameraView.setMaxFrameSize(480, 360);
+        mOpenCvCameraView.setMaxFrameSize(480, 480);
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
         mOpenCvCameraView.setCvCameraViewListener(this);
 
         NetworkTable.setClientMode();
-        NetworkTable.setDSClientEnabled(false);
+        NetworkTable.setNetworkIdentity("Android");
         NetworkTable.setIPAddress("Erik-PC");
+        NetworkTable.setPersistentFilename("/storage/emulated/0/networktables.ini");
         NetworkTable.initialize();
-        NetworkTable.getTable("/").putString("AndroidStatus", "Hello, World!");
+        networkTable = NetworkTable.getTable("Vision");
+        networkTable.addTableListenerEx(new ITableListener() {
+            @Override
+            public void valueChanged(ITable table, String key, Object value, boolean isNew) {
+                // unused
+            }
+
+            @Override
+            public void valueChangedEx(ITable table, String key, Object value, int flags) {
+                table.setPersistent(key);
+            }
+        }, ITable.NOTIFY_NEW | ITable.NOTIFY_IMMEDIATE);
 
         try {
-            CS_BROADCAST_ADDRESS = InetAddress.getByName("255.255.255.255");
+            findBroadcastAddress();
             udpCameraServerSocket = new DatagramSocket(CS_CONTROL_PORT);
             udpCameraServerSocket.setReuseAddress(true);
             udpCameraServerSocket.setBroadcast(true);
         } catch(Exception e) {
             Log.e(TAG, "UDP error", e);
+        }
+    }
+
+    public void findBroadcastAddress() {
+        // find the USB networking interface and get the broadcast address
+        if(CS_BROADCAST_ADDRESS != null) return;
+        try {
+            Enumeration<NetworkInterface> allInterfaces = NetworkInterface.getNetworkInterfaces();
+            while (allInterfaces.hasMoreElements()) {
+                NetworkInterface networkInterface = allInterfaces.nextElement();
+                if(networkInterface.getName().equals("rndis0") && networkInterface.isUp()) {
+                    for(InterfaceAddress addr : networkInterface.getInterfaceAddresses()) {
+                        if(addr == null) continue;
+                        InetAddress bcast = addr.getBroadcast();
+                        if(bcast == null) continue;
+                        Log.i(TAG, "Broadcast address: " + bcast.toString());
+                        CS_BROADCAST_ADDRESS = bcast;
+                    }
+                }
+            }
+        } catch(Exception e) {
+            Log.e(TAG, "Network error", e);
         }
     }
 
@@ -153,15 +191,6 @@ public class VisionTestActivity extends AppCompatActivity implements CameraBridg
     public void onCameraViewStopped() {
     }
 
-    public void onCalibClick(View v){
-        Intent intent = new Intent(this, CameraCalibrationActivity.class);
-        startActivity(intent);
-    }
-
-    public void onSaveClick(View v) {
-        doNextSave = true;
-    }
-
     protected float lastTouchX, lastTouchY;
 
     @Override
@@ -199,7 +228,6 @@ public class VisionTestActivity extends AppCompatActivity implements CameraBridg
             Imgcodecs.imwrite(saveFile, originalFrame);
         }
 
-        // Create copy for processing
         Mat procFrame = originalFrame.clone();
 
         // Convert to HSV for filtering
@@ -210,7 +238,7 @@ public class VisionTestActivity extends AppCompatActivity implements CameraBridg
 
         //// 2. Processing
         if (pixel != null) {
-            int prog = ((SeekBar) findViewById(R.id.seekBar)).getProgress();
+            int prog = (int) networkTable.getNumber("FilterLevel", 100);
 
             // Filter HSV by color specified by seek bar
             Core.inRange(procFrame, new Scalar(0, 0, 255 - prog), new Scalar(255, prog, 255), procFrame);
@@ -394,7 +422,11 @@ public class VisionTestActivity extends AppCompatActivity implements CameraBridg
             Imgproc.putText(originalFrame, status, new Point(0, 10), Core.FONT_HERSHEY_PLAIN, 1, markColor2);
         }
 
-        if(System.currentTimeMillis() - lastSendTime > 100) {
+        if(CS_BROADCAST_ADDRESS == null) {
+            findBroadcastAddress();
+        }
+
+        if(System.currentTimeMillis() - lastSendTime > 100 && CS_BROADCAST_ADDRESS != null) {
             MatOfByte output = new MatOfByte();
             Mat copyFrame = new Mat();
             Imgproc.cvtColor(originalFrame, copyFrame, Imgproc.COLOR_RGBA2BGR);
