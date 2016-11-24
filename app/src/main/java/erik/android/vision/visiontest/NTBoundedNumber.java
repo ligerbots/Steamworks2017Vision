@@ -7,10 +7,11 @@ public class NTBoundedNumber {
     public static final String LOWER = "lower";
     public static final String UPPER = "upper";
     public static final String VALUE = "value";
-    private ITable table;
+
+    private ITable mTable;
 
     public NTBoundedNumber(String path) {
-        this.table = NetworkTable.getTable(path);
+        this.mTable = NetworkTable.getTable(path);
     }
 
     public NTBoundedNumber(String path, double lower, double upper) {
@@ -21,19 +22,19 @@ public class NTBoundedNumber {
     }
 
     public ITable getTable() {
-        return table;
+        return mTable;
     }
 
     public double getLower() {
-        return table.getNumber(LOWER, 0);
+        return mTable.getNumber(LOWER, 0);
     }
 
     public double getUpper() {
-        return table.getNumber(UPPER, 0);
+        return mTable.getNumber(UPPER, 0);
     }
 
     public double getValue() {
-        double value = table.getNumber(VALUE, 0);
+        double value = mTable.getNumber(VALUE, 0);
         double lower = getLower();
         double upper = getUpper();
         if(value < lower) {
@@ -45,14 +46,14 @@ public class NTBoundedNumber {
     }
 
     public void setLower(double lower) {
-        table.putNumber(LOWER, lower);
+        mTable.putNumber(LOWER, lower);
     }
 
     public void setUpper(double upper) {
-        table.putNumber(UPPER, upper);
+        mTable.putNumber(UPPER, upper);
     }
 
     public void setValue(double value) {
-        table.putNumber(VALUE, value);
+        mTable.putNumber(VALUE, value);
     }
 }

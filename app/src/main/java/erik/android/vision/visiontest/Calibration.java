@@ -1,4 +1,4 @@
-package erik.android.vision.visiontest.calibration;
+package erik.android.vision.visiontest;
 
 import android.util.Log;
 
@@ -17,8 +17,12 @@ import org.opencv.imgproc.Imgproc;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CameraCalibrator {
-    private static final String TAG = "CameraCalibrator";
+import edu.wpi.first.wpilibj.networktables.NetworkTable;
+import edu.wpi.first.wpilibj.tables.ITable;
+
+public class Calibration {
+    private static final String TAG = "Calibration";
+    private static final String TABLE_NAME = "Vision/Calibration";
 
     private final Size mPatternSize = new Size(4, 11);
     private final int mCornersSize = (int)(mPatternSize.width * mPatternSize.height);
@@ -31,10 +35,11 @@ public class CameraCalibrator {
     private Mat mDistortionCoefficients = new Mat();
     private int mFlags;
     private double mRms;
-    private double mSquareSize = 0.669291; // in
     private Size mImageSize;
 
-    public CameraCalibrator(int width, int height) {
+    private ITable mTable;
+
+    public Calibration(int width, int height) {
         mImageSize = new Size(width, height);
         mFlags = Calib3d.CALIB_FIX_PRINCIPAL_POINT +
                  Calib3d.CALIB_ZERO_TANGENT_DIST +
@@ -45,6 +50,53 @@ public class CameraCalibrator {
         mCameraMatrix.put(0, 0, 1.0);
         Mat.zeros(5, 1, CvType.CV_64FC1).copyTo(mDistortionCoefficients);
         Log.i(TAG, "Instantiated new " + this.getClass());
+
+        mTable = NetworkTable.getTable(TABLE_NAME);
+
+        mTable.putBoolean("enableCalibration", false);
+
+        new NTCommand(TABLE_NAME + "/TakeFrame", "CalibrationTakeFrame", new Runnable() {
+            @Override
+            public void run() {
+                if(mTable.getBoolean("enableCalibration", false)) {
+                    addCorners();
+                }
+            }
+        });
+
+        new NTCommand(TABLE_NAME + "/Calibrate", "CalibrationCalibrate", new Runnable() {
+            @Override
+            public void run() {
+                if(mTable.getBoolean("enableCalibration", false)) {
+                    calibrate((float) mTable.getNumber("squareSize", 0.669291));
+                    Mat cameraMatrix = getCameraMatrix();
+                    Mat distortionCoefficients = getDistortionCoefficients();
+                    double[] cameraMatrixArray = new double[cameraMatrix.rows() * cameraMatrix.cols()];
+                    cameraMatrix.get(0, 0, cameraMatrixArray);
+                    double[] distortionCoefficientsArray = new double[distortionCoefficients.rows() * distortionCoefficients.cols()];
+                    distortionCoefficients.get(0, 0, distortionCoefficientsArray);
+                    mTable.putNumberArray("cameraMatrix", cameraMatrixArray);
+                    mTable.putNumberArray("distortionCoefficients", distortionCoefficientsArray);
+                    mTable.putNumberArray("calibrationResolution", new double[]{mImageSize.width, mImageSize.height});
+                }
+            }
+        });
+    }
+
+    public double[] getCameraMatrixArray() {
+        return mTable.getNumberArray("cameraMatrix", new double[0]);
+    }
+
+    public double[] getDistortionCoefficientsArray() {
+        return mTable.getNumberArray("distortionCoefficients", new double[0]);
+    }
+
+    public double[] getCalibrationResolutionArray() {
+        return mTable.getNumberArray("calibrationResolution", new double[0]);
+    }
+
+    public boolean isEnabled() {
+        return mTable.getBoolean("enableCalibration", false);
     }
 
     public void processFrame(Mat grayFrame, Mat rgbaFrame) {
@@ -52,13 +104,13 @@ public class CameraCalibrator {
         renderFrame(rgbaFrame);
     }
 
-    public void calibrate() {
+    public void calibrate(float squareSize) {
         ArrayList<Mat> rvecs = new ArrayList<Mat>();
         ArrayList<Mat> tvecs = new ArrayList<Mat>();
         Mat reprojectionErrors = new Mat();
         ArrayList<Mat> objectPoints = new ArrayList<Mat>();
         objectPoints.add(Mat.zeros(mCornersSize, 1, CvType.CV_32FC3));
-        calcBoardCornerPositions(objectPoints.get(0));
+        calcBoardCornerPositions(objectPoints.get(0), squareSize);
         for (int i = 1; i < mCornersBuffer.size(); i++) {
             objectPoints.add(objectPoints.get(0));
         }
@@ -69,8 +121,8 @@ public class CameraCalibrator {
         mIsCalibrated = Core.checkRange(mCameraMatrix)
                 && Core.checkRange(mDistortionCoefficients);
 
-        mRms = computeReprojectionErrors(objectPoints, rvecs, tvecs, reprojectionErrors);
-        Log.i(TAG, String.format("Average re-projection error: %f", mRms));
+        //mRms = computeReprojectionErrors(objectPoints, rvecs, tvecs, reprojectionErrors);
+        //Log.i(TAG, String.format("Average re-projection error: %f", mRms));
         Log.i(TAG, "Camera matrix: " + mCameraMatrix.dump());
         Log.i(TAG, "Distortion coefficients: " + mDistortionCoefficients.dump());
     }
@@ -79,16 +131,16 @@ public class CameraCalibrator {
         mCornersBuffer.clear();
     }
 
-    private void calcBoardCornerPositions(Mat corners) {
+    private void calcBoardCornerPositions(Mat corners, float squareSize) {
         final int cn = 3;
         float positions[] = new float[mCornersSize * cn];
 
         for (int i = 0; i < mPatternSize.height; i++) {
             for (int j = 0; j < mPatternSize.width * cn; j += cn) {
                 positions[(int) (i * mPatternSize.width * cn + j + 0)] =
-                        (2 * (j / cn) + i % 2) * (float) mSquareSize;
+                        (2 * (j / cn) + i % 2) * (float) squareSize;
                 positions[(int) (i * mPatternSize.width * cn + j + 1)] =
-                        i * (float) mSquareSize;
+                        i * (float) squareSize;
                 positions[(int) (i * mPatternSize.width * cn + j + 2)] = 0;
             }
         }

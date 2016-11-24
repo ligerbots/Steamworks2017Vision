@@ -2,7 +2,6 @@ package erik.android.vision.visiontest;
 
 import android.content.Context;
 import android.content.res.Configuration;
-import android.graphics.ImageFormat;
 import android.graphics.Matrix;
 import android.graphics.Point;
 import android.graphics.RectF;
@@ -18,6 +17,7 @@ import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -33,11 +33,9 @@ import android.view.WindowManager;
 import android.widget.Toast;
 
 import org.opencv.android.OpenCVLoader;
-import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.imgproc.Imgproc;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -46,27 +44,48 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
-import edu.wpi.first.wpilibj.tables.ITable;
-import edu.wpi.first.wpilibj.tables.ITableListener;
 import erik.android.vision.visiontest_native.AppNative;
 
 public class Camera2Activity extends AppCompatActivity {
-
     static {
         OpenCVLoader.initDebug();
     }
 
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
+
     static {
         ORIENTATIONS.append(Surface.ROTATION_0, 90);
         ORIENTATIONS.append(Surface.ROTATION_90, 0);
         ORIENTATIONS.append(Surface.ROTATION_180, 270);
         ORIENTATIONS.append(Surface.ROTATION_270, 180);
     }
+
     private static final String TAG = "Camera2Activity";
 
-    private static final int MAX_PREVIEW_WIDTH = 1920;
-    private static final int MAX_PREVIEW_HEIGHT = 1080;
+    private String mCameraId;
+    private AutoFitTextureView mTextureView;
+    private CameraCaptureSession mCaptureSession;
+    private CameraDevice mCameraDevice;
+    private Size mPreviewSize;
+
+    private HandlerThread mBackgroundThread;
+    private Handler mBackgroundHandler;
+
+    private ImageReader mImageReader;
+
+    private FpsCounter mImageReaderFps = new FpsCounter("ImageReader");
+
+    private int mNv21Width, mNv21Height, mRgbWidth, mRgbHeight;
+
+    private Calibration mCalibration;
+    private ImageProcessor mImageProcessor;
+
+    private CaptureRequest.Builder mPreviewRequestBuilder;
+    private CaptureRequest mPreviewRequest;
+    private final Semaphore mCameraOpenCloseLock = new Semaphore(1);
+    private int mSensorOrientation;
+
+    private boolean mNeedsToRestartRepeatingCapture = false;
 
     private final TextureView.SurfaceTextureListener mSurfaceTextureListener
             = new TextureView.SurfaceTextureListener() {
@@ -91,19 +110,6 @@ public class Camera2Activity extends AppCompatActivity {
         }
 
     };
-
-    private String mCameraId;
-    private AutoFitTextureView mTextureView;
-    private CameraCaptureSession mCaptureSession;
-    private CameraDevice mCameraDevice;
-    private Size mPreviewSize;
-
-    private Range<Integer> mSensitivityRange;
-    private Range<Long> mExposureTimeRange;
-    private Range<Long> mFrameTimeRange;
-
-    private NTBoundedNumber sensitivity;
-    private NTBoundedNumber exposureTime;
 
     private final CameraDevice.StateCallback mStateCallback = new CameraDevice.StateCallback() {
 
@@ -131,13 +137,6 @@ public class Camera2Activity extends AppCompatActivity {
         }
     };
 
-    private HandlerThread mBackgroundThread;
-    private Handler mBackgroundHandler;
-
-    private ImageReader mImageReader;
-
-    private double frameCount = 0;
-    private long lastTime = 0;
 
     private final ImageReader.OnImageAvailableListener mOnImageAvailableListener
             = new ImageReader.OnImageAvailableListener() {
@@ -145,37 +144,41 @@ public class Camera2Activity extends AppCompatActivity {
         @Override
         public void onImageAvailable(ImageReader reader) {
             Image img = reader.acquireLatestImage();
-            if(img == null) return;
+            if (img == null) return;
             Log.i(TAG, "Image available");
-            //Mat mat = imageYuv420888ToMat(img);
-            //mat.size();
+
+            // Use native hacks to get a Mat fast
+            // works on Nexus 5; is most likely phone-specific
+            long nv21MatPtr = AppNative.copyNV21BufferToMat(
+                    img.getPlanes()[0].getBuffer(), mNv21Width, mNv21Height);
+
+            Mat nv21Mat = new Mat(nv21MatPtr);
+            Mat imageBgrMat = new Mat();
+            Imgproc.cvtColor(nv21Mat, imageBgrMat, Imgproc.COLOR_YUV2BGR_NV12, 3);
+            Mat imageRgbMat = new Mat();
+            Imgproc.cvtColor(imageBgrMat, imageRgbMat, Imgproc.COLOR_BGR2RGB);
+
+            mImageProcessor.postUpdateAndDraw(imageBgrMat, imageRgbMat);
+
+            if(mCalibration.isEnabled()) {
+                mCalibration.processFrame(nv21Mat.submat(0, mRgbHeight, 0, mRgbWidth), imageRgbMat);
+            }
+
+            Imgproc.pyrDown(imageRgbMat, imageRgbMat);
+            Communications.cameraServerSendImage(imageRgbMat);
+
+            nv21Mat.release();
             img.close();
 
-            frameCount++;
-
-            if(System.currentTimeMillis() - lastTime > 1000) {
-                double dtMs = (double) (System.currentTimeMillis() - lastTime);
-                double dtS = dtMs / 1000;
-                Log.i(TAG, "FPS: " + (frameCount/dtS));
-                lastTime = System.currentTimeMillis();
-                frameCount = 0;
-            }
+            mImageReaderFps.feed();
         }
     };
-
-    private CaptureRequest.Builder mPreviewRequestBuilder;
-    private CaptureRequest mPreviewRequest;
-    private Semaphore mCameraOpenCloseLock = new Semaphore(1);
-    private int mSensorOrientation;
-
-    private double frameCount2 = 0;
-    private long lastTime2 = 0;
 
     private CameraCaptureSession.CaptureCallback mCaptureCallback
             = new CameraCaptureSession.CaptureCallback() {
 
         private void process(CaptureResult result) {
-            Log.i(TAG, "process callback: " + result.toString());
+            Log.i(TAG, "capture callback: " + result.toString());
         }
 
         @Override
@@ -190,18 +193,7 @@ public class Camera2Activity extends AppCompatActivity {
                                        @NonNull CaptureRequest request,
                                        @NonNull TotalCaptureResult result) {
             process(result);
-
-            frameCount2++;
-
-            if(System.currentTimeMillis() - lastTime2 > 1000) {
-                double dtMs = (double) (System.currentTimeMillis() - lastTime2);
-                double dtS = dtMs / 1000;
-                Log.i(TAG, "FPS 2: " + (frameCount2/dtS));
-                lastTime2 = System.currentTimeMillis();
-                frameCount2 = 0;
-            }
         }
-
     };
 
     private void showToast(final String text) {
@@ -213,41 +205,6 @@ public class Camera2Activity extends AppCompatActivity {
         });
     }
 
-    private static Size chooseOptimalSize(Size[] choices, int textureViewWidth,
-                                          int textureViewHeight, int maxWidth, int maxHeight, Size aspectRatio) {
-
-        // Collect the supported resolutions that are at least as big as the preview Surface
-        List<Size> bigEnough = new ArrayList<>();
-        // Collect the supported resolutions that are smaller than the preview Surface
-        List<Size> notBigEnough = new ArrayList<>();
-        int w = aspectRatio.getWidth();
-        int h = aspectRatio.getHeight();
-        for (Size option : choices) {
-            if (option.getWidth() <= maxWidth && option.getHeight() <= maxHeight &&
-                    option.getHeight() == option.getWidth() * h / w) {
-                if (option.getWidth() >= textureViewWidth &&
-                        option.getHeight() >= textureViewHeight) {
-                    bigEnough.add(option);
-                } else {
-                    notBigEnough.add(option);
-                }
-            }
-        }
-
-        // Pick the smallest of those big enough. If there is no one big enough, pick the
-        // largest of those not big enough.
-        if (bigEnough.size() > 0) {
-            return Collections.min(bigEnough, new CompareSizesByArea());
-        } else if (notBigEnough.size() > 0) {
-            return Collections.max(notBigEnough, new CompareSizesByArea());
-        } else {
-            Log.e(TAG, "Couldn't find any suitable preview size");
-            return choices[0];
-        }
-    }
-
-
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -255,14 +212,29 @@ public class Camera2Activity extends AppCompatActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         mTextureView = (AutoFitTextureView) findViewById(R.id.textureView);
 
-        NTClient.initNetworkTables();
+        Communications.initNetworkTables();
+        Communications.initCameraServer();
 
-        Log.i(TAG, "Got string: " + AppNative.helloWorldJni());
+        Log.i(TAG, "Phone info " + Build.MANUFACTURER + " " + Build.MODEL);
+
+        if(!Build.MANUFACTURER.equals("LGE") || !Build.MODEL.equals("Nexus 5")) {
+            // the issue is assuming that YUV_420_888 is equivalent to NV21. On the Nexus 5 it is;
+            // however the NV21 format itself is not a supported capture format. Thus AppNative
+            // has a hack to set a Mat data pointer to the Y channel ByteBuffer data pointer
+            // of the YUV_420_888 image. This may need to be replace with a proper generic
+            // YUV_420_888 to NV21 converter on other phones
+            // eg http://stackoverflow.com/a/35221548/1021196
+            Log.e(TAG, "Phone-specific native hacks may or may not work on this phone. " +
+                    "Update the code and then remove this notice.");
+            finish();
+        }
     }
 
     @Override
     protected void onDestroy() {
-        NTClient.closeNetworkTables();
+        super.onDestroy();
+        Communications.closeNetworkTables();
+        Communications.closeCameraServer();
     }
 
     @Override
@@ -307,56 +279,52 @@ public class Camera2Activity extends AppCompatActivity {
                     continue;
                 }
 
-                List<Size> captureSizes = Arrays.asList(map.getOutputSizes(ImageFormat.YUV_420_888));
-                for(Size s: captureSizes) {
+                List<Size> captureSizes =
+                        Arrays.asList(map.getOutputSizes(Parameters.CAPTURE_FORMAT));
+                for (Size s : captureSizes) {
                     Log.i(TAG, "Supported capture size: " + s.toString());
                 }
-                Size largest = Collections.max(captureSizes, new CompareSizesByArea());
+                Size largest = Parameters.CAPTURE_SIZE;
                 Log.i(TAG, "Capturing at: " + largest.getWidth() + "x" + largest.getHeight());
                 mImageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
-                        ImageFormat.YUV_420_888, 2);
+                        Parameters.CAPTURE_FORMAT, 2);
+                mNv21Width = largest.getHeight() + (largest.getHeight() / 2);
+                mNv21Height = largest.getWidth();
+                mRgbWidth = largest.getWidth();
+                mRgbHeight = largest.getHeight();
                 mImageReader.setOnImageAvailableListener(
                         mOnImageAvailableListener, mBackgroundHandler);
 
-                mSensitivityRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
-                Log.i(TAG, "Camera Info sensitivity range: " + (mSensitivityRange != null ? mSensitivityRange.toString() : null));
-                mExposureTimeRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE);
-                Log.i(TAG, "Camera Info exposure time range: " + (mExposureTimeRange != null ? mExposureTimeRange.toString() : null));
-                Long maxFrameDuration = characteristics.get(CameraCharacteristics.SENSOR_INFO_MAX_FRAME_DURATION);
-                long minFrameDuration = map.getOutputMinFrameDuration(ImageFormat.YUV_420_888, largest);
-                mFrameTimeRange = new Range<>(minFrameDuration, maxFrameDuration);
-                Log.i(TAG, "Camera Info frame time range: " + mFrameTimeRange.toString());
-                float[] apertures = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_APERTURES);
+                if(mCalibration == null) {
+                    mCalibration = new Calibration(mRgbWidth, mRgbHeight);
+                    mImageProcessor = new ImageProcessor(mCalibration);
+                }
+
+                Range<Integer> camSensitivityRange =
+                        characteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
+                Range<Long> camExposureTimeRange =
+                        characteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE);
+                Parameters.initCameraParameters(camSensitivityRange, camExposureTimeRange);
+                Log.i(TAG, "Camera Info sensitivity range: "
+                        + (Parameters.camSensitivityRange != null
+                        ? Parameters.camSensitivityRange.toString() : null));
+                Log.i(TAG, "Camera Info exposure time range: "
+                        + (Parameters.camExposureTimeRange != null
+                        ? Parameters.camExposureTimeRange.toString() : null));
+
+                Long maxFrameDuration =
+                        characteristics.get(CameraCharacteristics.SENSOR_INFO_MAX_FRAME_DURATION);
+                long minFrameDuration =
+                        map.getOutputMinFrameDuration(Parameters.CAPTURE_FORMAT, largest);
+                Range<Long> frameTimeRange = new Range<>(minFrameDuration, maxFrameDuration);
+                Log.i(TAG, "Camera Info frame time range: " + frameTimeRange.toString());
+                float[] apertures =
+                        characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_APERTURES);
                 Log.i(TAG, "Camera Info available apertures: " + Arrays.toString(apertures));
-                Float minFocus = characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
+                Float minFocus =
+                        characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
                 Log.i(TAG, "Camera Info focus range: 0.0-" + minFocus);
 
-                if(sensitivity == null) {
-                    sensitivity = new NTBoundedNumber("Vision/sensitivity", mSensitivityRange.getLower(), mSensitivityRange.getUpper());
-                    exposureTime = new NTBoundedNumber("Vision/exposureTime", mExposureTimeRange.getLower(), mExposureTimeRange.getUpper());
-
-                    ITableListener refresh = new ITableListener() {
-                        @Override
-                        public void valueChanged(ITable source, String key, Object value, boolean isNew) {
-                            Camera2Activity.this.runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    try {
-                                        mPreviewRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, (long) exposureTime.getValue());
-                                        mPreviewRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, (int) sensitivity.getValue());
-                                        mPreviewRequest = mPreviewRequestBuilder.build();
-                                        mCaptureSession.setRepeatingRequest(mPreviewRequest,
-                                                mCaptureCallback, mBackgroundHandler);
-                                    } catch(Exception e) {
-                                        Log.e(TAG, "Camera error", e);
-                                    }
-                                }
-                            });
-                        }
-                    };
-                    sensitivity.getTable().addTableListener(refresh);
-                    exposureTime.getTable().addTableListener(refresh);
-                }
                 // Find out if we need to swap dimension to get the preview size relative to sensor
                 // coordinate.
                 int displayRotation = getWindowManager().getDefaultDisplay().getRotation();
@@ -398,12 +366,12 @@ public class Camera2Activity extends AppCompatActivity {
                     maxPreviewHeight = displaySize.x;
                 }
 
-                if (maxPreviewWidth > MAX_PREVIEW_WIDTH) {
-                    maxPreviewWidth = MAX_PREVIEW_WIDTH;
+                if (maxPreviewWidth > Parameters.MAX_PREVIEW_WIDTH) {
+                    maxPreviewWidth = Parameters.MAX_PREVIEW_WIDTH;
                 }
 
-                if (maxPreviewHeight > MAX_PREVIEW_HEIGHT) {
-                    maxPreviewHeight = MAX_PREVIEW_HEIGHT;
+                if (maxPreviewHeight > Parameters.MAX_PREVIEW_HEIGHT) {
+                    maxPreviewHeight = Parameters.MAX_PREVIEW_HEIGHT;
                 }
 
                 // Danger, W.R.! Attempting to use too large a preview size could  exceed the camera
@@ -441,7 +409,7 @@ public class Camera2Activity extends AppCompatActivity {
                 throw new RuntimeException("Time out waiting to lock camera opening.");
             }
             manager.openCamera(mCameraId, mStateCallback, mBackgroundHandler);
-        } catch(SecurityException e) {
+        } catch (SecurityException e) {
             e.printStackTrace();
         } catch (Exception e) {
             e.printStackTrace();
@@ -509,7 +477,8 @@ public class Camera2Activity extends AppCompatActivity {
                     new CameraCaptureSession.StateCallback() {
 
                         @Override
-                        public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
+                        public void onConfigured(
+                                @NonNull CameraCaptureSession cameraCaptureSession) {
                             // The camera is already closed
                             if (null == mCameraDevice) {
                                 return;
@@ -517,15 +486,18 @@ public class Camera2Activity extends AppCompatActivity {
 
                             // When the session is ready, we start displaying the preview.
                             mCaptureSession = cameraCaptureSession;
+
                             try {
                                 // Auto focus should be continuous for camera preview.
                                 mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
                                         CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
 
-                                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF);
-                                mPreviewRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, (long) exposureTime.getValue());
-                                mPreviewRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, (int) sensitivity.getUpper());
-//                                mPreviewRequestBuilder.set(CaptureRequest.SENSOR_FRAME_DURATION, );
+                                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
+                                        CaptureRequest.CONTROL_AE_MODE_OFF);
+                                mPreviewRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME,
+                                        (long) Parameters.exposureTime.getValue());
+                                mPreviewRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY,
+                                        (int) Parameters.sensitivity.getValue());
 
                                 // Finally, we start displaying the camera preview.
                                 mPreviewRequest = mPreviewRequestBuilder.build();
@@ -534,12 +506,51 @@ public class Camera2Activity extends AppCompatActivity {
                             } catch (CameraAccessException e) {
                                 e.printStackTrace();
                             }
+
+                            Parameters.setCameraParametersUpdateRunnable(new Runnable(){
+                                @Override
+                                public void run() {
+                                    Camera2Activity.this.runOnUiThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            Log.i(TAG, "NT restart triggered");
+                                            try {
+                                                mPreviewRequestBuilder.set(
+                                                        CaptureRequest.SENSOR_EXPOSURE_TIME,
+                                                        (long) Parameters.exposureTime.getValue());
+                                                mPreviewRequestBuilder.set(
+                                                        CaptureRequest.SENSOR_SENSITIVITY,
+                                                        (int) Parameters.sensitivity.getValue());
+                                                mPreviewRequest = mPreviewRequestBuilder.build();
+                                                mNeedsToRestartRepeatingCapture = true;
+                                                mCaptureSession.stopRepeating();
+                                            } catch (Exception e) {
+                                                Log.e(TAG, "Camera error", e);
+                                            }
+                                        }
+                                    });
+                                }
+                            });
                         }
 
                         @Override
                         public void onConfigureFailed(
                                 @NonNull CameraCaptureSession cameraCaptureSession) {
                             showToast("Failed");
+                        }
+
+                        @Override
+                        public void onReady (@NonNull CameraCaptureSession session) {
+                            if(mNeedsToRestartRepeatingCapture) {
+                                Log.i(TAG, "NT restart session");
+                                mNeedsToRestartRepeatingCapture = false;
+                                try {
+                                    mCaptureSession.setRepeatingRequest(mPreviewRequest,
+                                            mCaptureCallback, mBackgroundHandler);
+                                } catch (CameraAccessException e) {
+                                    e.printStackTrace();
+                                }
+                            }
                         }
                     }, null
             );
@@ -572,66 +583,47 @@ public class Camera2Activity extends AppCompatActivity {
         mTextureView.setTransform(matrix);
     }
 
-    // http://stackoverflow.com/a/35221548/1021196
-    protected static Mat imageYuv420888ToMat(Image image) {
-        ByteBuffer buffer;
-        int rowStride;
-        int pixelStride;
-        int width = image.getWidth();
-        int height = image.getHeight();
-        int offset = 0;
-
-        Image.Plane[] planes = image.getPlanes();
-        byte[] data = new byte[image.getWidth() * image.getHeight() * ImageFormat.getBitsPerPixel(ImageFormat.YUV_420_888) / 8];
-        byte[] rowData = new byte[planes[0].getRowStride()];
-
-        for (int i = 0; i < planes.length; i++) {
-            buffer = planes[i].getBuffer();
-            rowStride = planes[i].getRowStride();
-            pixelStride = planes[i].getPixelStride();
-            int w = (i == 0) ? width : width / 2;
-            int h = (i == 0) ? height : height / 2;
-            for (int row = 0; row < h; row++) {
-                int bytesPerPixel = ImageFormat.getBitsPerPixel(ImageFormat.YUV_420_888) / 8;
-                if (pixelStride == bytesPerPixel) {
-                    int length = w * bytesPerPixel;
-                    buffer.get(data, offset, length);
-
-                    if (h - row != 1) {
-                        buffer.position(buffer.position() + rowStride - length);
-                    }
-                    offset += length;
-                } else {
-
-
-                    if (h - row == 1) {
-                        buffer.get(rowData, 0, width - pixelStride + 1);
-                    } else {
-                        buffer.get(rowData, 0, rowStride);
-                    }
-
-                    for (int col = 0; col < w; col++) {
-                        data[offset++] = rowData[col * pixelStride];
-                    }
-                }
-            }
-        }
-
-        Mat mat = new Mat(height + height / 2, width, CvType.CV_8UC1);
-        mat.put(0, 0, data);
-
-        Mat bgrMat = new Mat(image.getHeight(), image.getWidth(),CvType.CV_8UC4);
-        Imgproc.cvtColor(mat, bgrMat, Imgproc.COLOR_YUV2BGR_I420);
-
-        return bgrMat;
-    }
-
+    @SuppressWarnings("unused")
     private int getOrientation(int rotation) {
         // Sensor orientation is 90 for most devices, or 270 for some devices (eg. Nexus 5X)
         // We have to take that into account and rotate the image properly.
         // For devices with orientation of 90, we simply return our mapping from ORIENTATIONS.
         // For devices with orientation of 270, we need to rotate the image 180 degrees.
         return (ORIENTATIONS.get(rotation) + mSensorOrientation + 270) % 360;
+    }
+
+    private static Size chooseOptimalSize(Size[] choices, int textureViewWidth,
+                                          int textureViewHeight, int maxWidth, int maxHeight,
+                                          Size aspectRatio) {
+
+        // Collect the supported resolutions that are at least as big as the preview Surface
+        List<Size> bigEnough = new ArrayList<>();
+        // Collect the supported resolutions that are smaller than the preview Surface
+        List<Size> notBigEnough = new ArrayList<>();
+        int w = aspectRatio.getWidth();
+        int h = aspectRatio.getHeight();
+        for (Size option : choices) {
+            if (option.getWidth() <= maxWidth && option.getHeight() <= maxHeight &&
+                    option.getHeight() == option.getWidth() * h / w) {
+                if (option.getWidth() >= textureViewWidth &&
+                        option.getHeight() >= textureViewHeight) {
+                    bigEnough.add(option);
+                } else {
+                    notBigEnough.add(option);
+                }
+            }
+        }
+
+        // Pick the smallest of those big enough. If there is no one big enough, pick the
+        // largest of those not big enough.
+        if (bigEnough.size() > 0) {
+            return Collections.min(bigEnough, new CompareSizesByArea());
+        } else if (notBigEnough.size() > 0) {
+            return Collections.max(notBigEnough, new CompareSizesByArea());
+        } else {
+            Log.e(TAG, "Couldn't find any suitable preview size");
+            return choices[0];
+        }
     }
 
     static class CompareSizesByArea implements Comparator<Size> {
