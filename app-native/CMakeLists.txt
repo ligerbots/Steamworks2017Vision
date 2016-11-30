@@ -25,6 +25,39 @@ set_target_properties( libopencv_java3
                        PROPERTIES IMPORTED_LOCATION
                        ${CMAKE_SOURCE_DIR}/../app/src/main/jniLibs/${ANDROID_ABI}/libopencv_java3.so )
 
+# add ffmpeg
+add_library( libx264
+             SHARED
+             IMPORTED )
+
+set_target_properties( libx264
+                       PROPERTIES IMPORTED_LOCATION
+                       ${CMAKE_SOURCE_DIR}/../app/src/main/jniLibs/${ANDROID_ABI}/libx264.so )
+
+add_library( libavutil
+             SHARED
+             IMPORTED )
+
+set_target_properties( libavutil
+                       PROPERTIES IMPORTED_LOCATION
+                       ${CMAKE_SOURCE_DIR}/../app/src/main/jniLibs/${ANDROID_ABI}/libavutil.so )
+
+add_library( libavformat
+             SHARED
+             IMPORTED )
+
+set_target_properties( libavformat
+                       PROPERTIES IMPORTED_LOCATION
+                       ${CMAKE_SOURCE_DIR}/../app/src/main/jniLibs/${ANDROID_ABI}/libavformat.so )
+
+add_library( libavcodec
+             SHARED
+             IMPORTED )
+
+set_target_properties( libavcodec
+                       PROPERTIES IMPORTED_LOCATION
+                       ${CMAKE_SOURCE_DIR}/../app/src/main/jniLibs/${ANDROID_ABI}/libavcodec.so )
+
 # link everything
 target_link_libraries( app-native
-                       ${log-lib} libopencv_java3 )
+                       ${log-lib} libopencv_java3 libx264 libavutil libavformat libavcodec )

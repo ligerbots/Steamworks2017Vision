@@ -164,9 +164,14 @@ public class Camera2Activity extends AppCompatActivity {
                 mCalibration.processFrame(nv21Mat.submat(0, mRgbHeight, 0, mRgbWidth), imageRgbMat);
             }
 
-            Imgproc.pyrDown(imageRgbMat, imageRgbMat);
-            Communications.cameraServerSendImage(imageRgbMat);
-
+            //Imgproc.pyrDown(imageRgbMat, imageRgbMat);
+            //Communications.cameraServerSendImage(imageRgbMat);
+            Mat toEncode = new Mat();
+            Imgproc.cvtColor(imageRgbMat, toEncode, Imgproc.COLOR_BGR2YUV_I420);
+            RTPStreaming.encodeFrame(toEncode);
+            toEncode.release();
+            imageBgrMat.release();
+            imageRgbMat.release();
             nv21Mat.release();
             img.close();
 
@@ -213,7 +218,9 @@ public class Camera2Activity extends AppCompatActivity {
         mTextureView = (AutoFitTextureView) findViewById(R.id.textureView);
 
         Communications.initNetworkTables();
-        Communications.initCameraServer();
+        //Communications.initCameraServer();
+        AppNative.ffmpegInit();
+        RTPStreaming.init("Erik-PC", 5809);
 
         Log.i(TAG, "Phone info " + Build.MANUFACTURER + " " + Build.MODEL);
 
