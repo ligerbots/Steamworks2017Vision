@@ -28,6 +28,7 @@ public class Communications {
     public static final int CS_CONTROL_PORT = 5809;
     public static final int CS_STREAM_PORT = 5810;
     public static final byte[] CS_MAGIC_NUMBER = new byte[]{1, 0, 0, 0};
+    public static final int DATA_PORT = 5808;
 
     protected static InetAddress broadcastAddress = null;
     protected static DatagramChannel udpCameraServerChannel = null;
@@ -71,6 +72,22 @@ public class Communications {
             e.printStackTrace();
         }
         udpCameraServerChannel = null;
+    }
+
+    public static void dataServerSendData(double rvec_0, double rvec_1, double rvec_2, double tvec_0, double tvec_1, double tvec_2) {
+        ByteBuffer packet = ByteBuffer.allocateDirect(Double.SIZE / 8 * 6);
+        packet.position(0);
+        packet.putDouble(rvec_0);
+        packet.putDouble(rvec_1);
+        packet.putDouble(rvec_2);
+        packet.putDouble(tvec_0);
+        packet.putDouble(tvec_1);
+        packet.putDouble(tvec_2);
+        try {
+            udpCameraServerChannel.send(packet, new InetSocketAddress(broadcastAddress, DATA_PORT));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public static void cameraServerSendImage(Mat rgbFrame) {

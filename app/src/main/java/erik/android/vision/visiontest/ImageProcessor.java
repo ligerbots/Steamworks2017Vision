@@ -246,6 +246,7 @@ public class ImageProcessor implements Runnable {
                             result.putNumber("tvec_x", tvecDouble[0]);
                             result.putNumber("tvec_y", tvecDouble[1]);
                             result.putNumber("tvec_z", tvecDouble[2]);
+                            Communications.dataServerSendData(rvecDouble[0], rvecDouble[1], rvecDouble[2], tvecDouble[0], tvecDouble[1], tvecDouble[2]);
                         }
                     }
                 }
