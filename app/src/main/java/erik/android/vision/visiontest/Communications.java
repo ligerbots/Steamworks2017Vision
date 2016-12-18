@@ -17,6 +17,7 @@ import java.nio.channels.DatagramChannel;
 import java.util.Enumeration;
 
 import edu.wpi.first.wpilibj.networktables.NetworkTable;
+import edu.wpi.first.wpilibj.networktables.NetworkTablesJNI;
 import erik.android.vision.visiontest_native.AppNative;
 
 public class Communications {
@@ -45,6 +46,10 @@ public class Communications {
 
     public static void closeNetworkTables() {
         NetworkTable.shutdown();
+    }
+
+    public static boolean isNetworkTablesConnected() {
+        return NetworkTablesJNI.getConnections().length > 0;
     }
 
     public static void initCameraServer() {

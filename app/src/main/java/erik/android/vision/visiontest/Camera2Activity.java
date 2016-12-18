@@ -87,6 +87,8 @@ public class Camera2Activity extends AppCompatActivity {
 
     private boolean mNeedsToRestartRepeatingCapture = false;
 
+    private CrashRestarter crashRestarter;
+
     private final TextureView.SurfaceTextureListener mSurfaceTextureListener
             = new TextureView.SurfaceTextureListener() {
 
@@ -217,9 +219,33 @@ public class Camera2Activity extends AppCompatActivity {
                 WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON);
         mTextureView = (AutoFitTextureView) findViewById(R.id.textureView);
 
+        Thread.UncaughtExceptionHandler handler = new Thread.UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(Thread t, Throwable e) {
+                e.printStackTrace();
+                System.exit(-1);
+            }
+        };
+        Thread.setDefaultUncaughtExceptionHandler(handler);
+        Thread.currentThread().setUncaughtExceptionHandler(handler);
+
+        crashRestarter = new CrashRestarter(this);
+
         Communications.enableUsbTethering();
         Communications.initNetworkTables();
         Communications.initCameraServer();
+
+        new NTCommand("Vision/Crash", "Crash", new Runnable() {
+            @Override
+            public void run() {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        throw new RuntimeException("Triggered crash");
+                    }
+                });
+            }
+        });
 
         Log.i(TAG, "Phone info " + Build.MANUFACTURER + " " + Build.MODEL);
 
