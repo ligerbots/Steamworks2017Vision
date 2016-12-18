@@ -209,9 +209,15 @@ public class Camera2Activity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera2);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
+                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD |
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON |
+                WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON);
         mTextureView = (AutoFitTextureView) findViewById(R.id.textureView);
 
+        Communications.enableUsbTethering();
         Communications.initNetworkTables();
         Communications.initCameraServer();
 
@@ -455,10 +461,33 @@ public class Camera2Activity extends AppCompatActivity {
         }
     }
 
+    private void restartCameraSession() {
+        Log.i(TAG, "Restarting camera session");
+        try {
+            closeCamera();
+        } catch(Exception e) {
+            // don't care
+            e.printStackTrace();
+        }
+        if (mTextureView.isAvailable()) {
+            this.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    openCamera(mTextureView.getWidth(), mTextureView.getHeight());
+                }
+            });
+        } else {
+            mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
+        }
+    }
+
     private void createCameraPreviewSession() {
         try {
             SurfaceTexture texture = mTextureView.getSurfaceTexture();
-            assert texture != null;
+            if(texture == null) {
+                restartCameraSession();
+                return;
+            }
 
             // We configure the size of default buffer to be the size of camera preview we want.
             texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
@@ -501,8 +530,14 @@ public class Camera2Activity extends AppCompatActivity {
 
                                 // Finally, we start displaying the camera preview.
                                 mPreviewRequest = mPreviewRequestBuilder.build();
-                                mCaptureSession.setRepeatingRequest(mPreviewRequest,
-                                        mCaptureCallback, mBackgroundHandler);
+                                try {
+                                    mCaptureSession.setRepeatingRequest(mPreviewRequest,
+                                            mCaptureCallback, mBackgroundHandler);
+                                } catch(IllegalStateException | SecurityException e) {
+                                    // session closed
+                                    restartCameraSession();
+                                    return;
+                                }
                             } catch (CameraAccessException e) {
                                 e.printStackTrace();
                             }
@@ -523,7 +558,12 @@ public class Camera2Activity extends AppCompatActivity {
                                                         (int) Parameters.sensitivity.getValue());
                                                 mPreviewRequest = mPreviewRequestBuilder.build();
                                                 mNeedsToRestartRepeatingCapture = true;
-                                                mCaptureSession.stopRepeating();
+                                                try {
+                                                    mCaptureSession.stopRepeating();
+                                                } catch(IllegalStateException | SecurityException e) {
+                                                    // session closed
+                                                    restartCameraSession();
+                                                }
                                             } catch (Exception e) {
                                                 Log.e(TAG, "Camera error", e);
                                             }
@@ -549,6 +589,9 @@ public class Camera2Activity extends AppCompatActivity {
                                             mCaptureCallback, mBackgroundHandler);
                                 } catch (CameraAccessException e) {
                                     e.printStackTrace();
+                                } catch(IllegalStateException | SecurityException e) {
+                                    // session closed
+                                    restartCameraSession();
                                 }
                             }
                         }

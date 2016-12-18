@@ -139,4 +139,13 @@ public class Communications {
             Log.e(TAG, "Network error", e);
         }
     }
+
+    public static void enableUsbTethering() {
+        // http://stackoverflow.com/a/24346101/1021196
+        try {
+            Runtime.getRuntime().exec("su -c service call connectivity 30 i32 1");
+        } catch(Exception e) {
+            Log.e(TAG, "Error enabling tethering", e);
+        }
+    }
 }
