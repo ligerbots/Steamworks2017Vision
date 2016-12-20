@@ -3,6 +3,9 @@ package erik.android.vision.visiontest;
 import edu.wpi.first.wpilibj.networktables.NetworkTable;
 import edu.wpi.first.wpilibj.tables.ITable;
 
+/**
+ * A NetworkTables object that represents a number bounded by an upper and lower value
+ */
 public class NTBoundedNumber {
     public static final String LOWER = "lower";
     public static final String UPPER = "upper";

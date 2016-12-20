@@ -4,6 +4,9 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 
+/**
+ * This is the BroadcastReceiver that is triggered on boot and starts the app
+ */
 public class BootReceiver extends BroadcastReceiver {
     public BootReceiver() {
     }

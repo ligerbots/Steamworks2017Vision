@@ -16,6 +16,10 @@ import java.util.List;
 
 import edu.wpi.first.wpilibj.networktables.NetworkTable;
 
+/**
+ * A NetworkTables object for selecting a color thresholding range.
+ * Supports sending image histograms to assist people in selecting the range
+ */
 public class NTColorPicker {
     public enum ColorMode {
         HSV(new float[][]{
@@ -76,7 +80,8 @@ public class NTColorPicker {
         for(int i = 0; i < planes.size(); i++) {
             Mat hist = new Mat();
             MatOfFloat histRange = new MatOfFloat(ranges[i]);
-            Imgproc.calcHist(Collections.singletonList(planes.get(i)), new MatOfInt(0), new Mat(), hist, histSize, histRange, accumulate);
+            Imgproc.calcHist(Collections.singletonList(planes.get(i)), new MatOfInt(0),
+                    new Mat(), hist, histSize, histRange, accumulate);
             float[] histIntArray = new float[hist.rows() * hist.cols()];
             hist.get(0, 0, histIntArray);
             double[] histDoubleArray = new double[histIntArray.length];

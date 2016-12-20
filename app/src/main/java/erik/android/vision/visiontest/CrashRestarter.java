@@ -8,6 +8,9 @@ import android.os.Environment;
 import android.util.Log;
 import java.io.File;
 
+/**
+ * Restarts the app if it crashes
+ */
 public class CrashRestarter extends Thread {
     private Camera2Activity instance;
     private AlarmManager alarmManager;
@@ -40,8 +43,11 @@ public class CrashRestarter extends Thread {
 
     private void loop() {
         Log.i("CrashRestarter", "Setting alarm");
+        // set an alarm for 5 seconds. As long as we keep resetting it every 4 seconds, it won't
+        // trigger. If the app crashes, it will trigger after 5 seconds
         Intent intent = new Intent(instance, AlarmReceiver.class);
         PendingIntent restartIntent = PendingIntent.getBroadcast(instance, 2877, intent, 0);
-        alarmManager.setExact(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 5000, restartIntent);
+        alarmManager.setExact(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 5000,
+                restartIntent);
     }
 }

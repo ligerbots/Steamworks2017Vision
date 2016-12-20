@@ -46,8 +46,13 @@ import java.util.concurrent.TimeUnit;
 
 import erik.android.vision.visiontest_native.AppNative;
 
+/**
+ * The main activity class
+ */
 public class Camera2Activity extends AppCompatActivity {
     static {
+        // "debug" isn't really debug. This means load OpenCV using the local copy instead of
+        // going through OpenCV Manager. OpenCV Manager is annoying because it's async
         OpenCVLoader.initDebug();
     }
 
@@ -75,8 +80,10 @@ public class Camera2Activity extends AppCompatActivity {
 
     private FpsCounter mImageReaderFps = new FpsCounter("ImageReader");
 
+    // dimensions of the image in NV21 and RGB format
     private int mNv21Width, mNv21Height, mRgbWidth, mRgbHeight;
 
+    // helper classes
     private Calibration mCalibration;
     private ImageProcessor mImageProcessor;
 
@@ -85,10 +92,16 @@ public class Camera2Activity extends AppCompatActivity {
     private final Semaphore mCameraOpenCloseLock = new Semaphore(1);
     private int mSensorOrientation;
 
+    // set to true when camera parameters are updated and we need to restart the capture session
     private boolean mNeedsToRestartRepeatingCapture = false;
 
     private CrashRestarter crashRestarter;
 
+    /**
+     * Listener for when the display is ready. Opens the camera and configures displaying.
+     * It's not really that important; I'm pretty sure the camera will still work without a visible
+     * display but it's helpful to have and doesn't seem to impact performance
+     */
     private final TextureView.SurfaceTextureListener mSurfaceTextureListener
             = new TextureView.SurfaceTextureListener() {
 
@@ -113,6 +126,9 @@ public class Camera2Activity extends AppCompatActivity {
 
     };
 
+    /**
+     * Because we want to know what's going on with the camera
+     */
     private final CameraDevice.StateCallback mStateCallback = new CameraDevice.StateCallback() {
 
         @Override
@@ -140,6 +156,9 @@ public class Camera2Activity extends AppCompatActivity {
     };
 
 
+    /**
+     * Recieves camera images and sends them to the image processor
+     */
     private final ImageReader.OnImageAvailableListener mOnImageAvailableListener
             = new ImageReader.OnImageAvailableListener() {
 
@@ -154,18 +173,21 @@ public class Camera2Activity extends AppCompatActivity {
             long nv21MatPtr = AppNative.copyNV21BufferToMat(
                     img.getPlanes()[0].getBuffer(), mNv21Width, mNv21Height);
 
+            // now we need an RGB image
             Mat nv21Mat = new Mat(nv21MatPtr);
             Mat imageBgrMat = new Mat();
             Imgproc.cvtColor(nv21Mat, imageBgrMat, Imgproc.COLOR_YUV2BGR_NV12, 3);
             Mat imageRgbMat = new Mat();
             Imgproc.cvtColor(imageBgrMat, imageRgbMat, Imgproc.COLOR_BGR2RGB);
 
+            // draw over the image using processing data
             mImageProcessor.postUpdateAndDraw(imageBgrMat, imageRgbMat);
 
             if(mCalibration.isEnabled()) {
                 mCalibration.processFrame(nv21Mat.submat(0, mRgbHeight, 0, mRgbWidth), imageRgbMat);
             }
 
+            // send the image to SmartDashboard at a lower resolution
             Imgproc.pyrDown(imageRgbMat, imageRgbMat);
             Communications.cameraServerSendImage(imageRgbMat);
 
@@ -176,6 +198,9 @@ public class Camera2Activity extends AppCompatActivity {
         }
     };
 
+    /**
+     * Not really necessary, but the Google example used this
+     */
     private CameraCaptureSession.CaptureCallback mCaptureCallback
             = new CameraCaptureSession.CaptureCallback() {
 
@@ -211,6 +236,7 @@ public class Camera2Activity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera2);
+        // automatically unlock the phone, keep screen on, etc
         getWindow().addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
                 WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD |
@@ -219,6 +245,7 @@ public class Camera2Activity extends AppCompatActivity {
                 WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON);
         mTextureView = (AutoFitTextureView) findViewById(R.id.textureView);
 
+        // get rid of those pesky "App has stopped" dialogs so we can restart on crashes
         Thread.UncaughtExceptionHandler handler = new Thread.UncaughtExceptionHandler() {
             @Override
             public void uncaughtException(Thread t, Throwable e) {
@@ -231,7 +258,8 @@ public class Camera2Activity extends AppCompatActivity {
 
         crashRestarter = new CrashRestarter(this);
 
-        Communications.enableUsbTethering();
+        // init communications
+        Communications.enableUsbTethering(this);
         Communications.initNetworkTables();
         Communications.initCameraServer();
 
@@ -299,7 +327,7 @@ public class Camera2Activity extends AppCompatActivity {
                 CameraCharacteristics characteristics
                         = manager.getCameraCharacteristics(cameraId);
 
-                // We don't use a front facing camera in this sample.
+                // We don't use a front facing camera
                 Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
                 if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
                     continue;
@@ -316,22 +344,25 @@ public class Camera2Activity extends AppCompatActivity {
                 for (Size s : captureSizes) {
                     Log.i(TAG, "Supported capture size: " + s.toString());
                 }
-                Size largest = Parameters.CAPTURE_SIZE;
-                Log.i(TAG, "Capturing at: " + largest.getWidth() + "x" + largest.getHeight());
-                mImageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
-                        Parameters.CAPTURE_FORMAT, 2);
-                mNv21Width = largest.getHeight() + (largest.getHeight() / 2);
-                mNv21Height = largest.getWidth();
-                mRgbWidth = largest.getWidth();
-                mRgbHeight = largest.getHeight();
+                Size captureSize = Parameters.CAPTURE_SIZE;
+                Log.i(TAG, "Capturing at: "
+                        + captureSize.getWidth() + "x" + captureSize.getHeight());
+                mImageReader = ImageReader.newInstance(captureSize.getWidth(),
+                        captureSize.getHeight(), Parameters.CAPTURE_FORMAT, 2);
+                mNv21Width = captureSize.getHeight() + (captureSize.getHeight() / 2);
+                mNv21Height = captureSize.getWidth();
+                mRgbWidth = captureSize.getWidth();
+                mRgbHeight = captureSize.getHeight();
                 mImageReader.setOnImageAvailableListener(
                         mOnImageAvailableListener, mBackgroundHandler);
 
+                // initialize calibration and processing
                 if(mCalibration == null) {
                     mCalibration = new Calibration(mRgbWidth, mRgbHeight);
                     mImageProcessor = new ImageProcessor(mCalibration);
                 }
 
+                // find camera info and send it to SmartDashboard
                 Range<Integer> camSensitivityRange =
                         characteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
                 Range<Long> camExposureTimeRange =
@@ -347,7 +378,7 @@ public class Camera2Activity extends AppCompatActivity {
                 Long maxFrameDuration =
                         characteristics.get(CameraCharacteristics.SENSOR_INFO_MAX_FRAME_DURATION);
                 long minFrameDuration =
-                        map.getOutputMinFrameDuration(Parameters.CAPTURE_FORMAT, largest);
+                        map.getOutputMinFrameDuration(Parameters.CAPTURE_FORMAT, captureSize);
                 Range<Long> frameTimeRange = new Range<>(minFrameDuration, maxFrameDuration);
                 Log.i(TAG, "Camera Info frame time range: " + frameTimeRange.toString());
                 float[] apertures =
@@ -356,6 +387,8 @@ public class Camera2Activity extends AppCompatActivity {
                 Float minFocus =
                         characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
                 Log.i(TAG, "Camera Info focus range: 0.0-" + minFocus);
+
+                // now the rest of this method is all Google example code
 
                 // Find out if we need to swap dimension to get the preview size relative to sensor
                 // coordinate.
@@ -411,7 +444,7 @@ public class Camera2Activity extends AppCompatActivity {
                 // garbage capture data.
                 mPreviewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class),
                         rotatedPreviewWidth, rotatedPreviewHeight, maxPreviewWidth,
-                        maxPreviewHeight, largest);
+                        maxPreviewHeight, captureSize);
 
                 // We fit the aspect ratio of TextureView to the size of preview we picked.
                 int orientation = getResources().getConfiguration().orientation;
@@ -442,6 +475,8 @@ public class Camera2Activity extends AppCompatActivity {
             }
             manager.openCamera(mCameraId, mStateCallback, mBackgroundHandler);
         } catch (SecurityException e) {
+            // permissions problem. Go enable the permission. I'm too lazy
+            // to put in the code to ask for it
             e.printStackTrace();
         } catch (Exception e) {
             e.printStackTrace();
@@ -487,7 +522,12 @@ public class Camera2Activity extends AppCompatActivity {
         }
     }
 
+    /**
+     * We try to start the app right on boot. Sometimes the camera isn't ready and throws random
+     * exceptions. This method handles errors by restarting the camera session
+     */
     private void restartCameraSession() {
+        //
         Log.i(TAG, "Restarting camera session");
         try {
             closeCamera();
@@ -560,7 +600,7 @@ public class Camera2Activity extends AppCompatActivity {
                                     mCaptureSession.setRepeatingRequest(mPreviewRequest,
                                             mCaptureCallback, mBackgroundHandler);
                                 } catch(IllegalStateException | SecurityException e) {
-                                    // session closed
+                                    // session closed, restart it
                                     restartCameraSession();
                                     return;
                                 }
@@ -568,6 +608,8 @@ public class Camera2Activity extends AppCompatActivity {
                                 e.printStackTrace();
                             }
 
+                            // when parameters are updated via SmartDashboard, restart the capture
+                            // session
                             Parameters.setCameraParametersUpdateRunnable(new Runnable(){
                                 @Override
                                 public void run() {
@@ -586,7 +628,8 @@ public class Camera2Activity extends AppCompatActivity {
                                                 mNeedsToRestartRepeatingCapture = true;
                                                 try {
                                                     mCaptureSession.stopRepeating();
-                                                } catch(IllegalStateException | SecurityException e) {
+                                                } catch(IllegalStateException |
+                                                        SecurityException e) {
                                                     // session closed
                                                     restartCameraSession();
                                                 }
@@ -628,6 +671,7 @@ public class Camera2Activity extends AppCompatActivity {
         }
     }
 
+    // rest of this file is Google example code
     private void configureTransform(int viewWidth, int viewHeight) {
         if (null == mTextureView || null == mPreviewSize) {
             return;

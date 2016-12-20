@@ -71,13 +71,16 @@ public class Calibration {
                     calibrate((float) mTable.getNumber("squareSize", 0.669291));
                     Mat cameraMatrix = getCameraMatrix();
                     Mat distortionCoefficients = getDistortionCoefficients();
-                    double[] cameraMatrixArray = new double[cameraMatrix.rows() * cameraMatrix.cols()];
+                    double[] cameraMatrixArray =
+                            new double[cameraMatrix.rows() * cameraMatrix.cols()];
                     cameraMatrix.get(0, 0, cameraMatrixArray);
-                    double[] distortionCoefficientsArray = new double[distortionCoefficients.rows() * distortionCoefficients.cols()];
+                    double[] distortionCoefficientsArray = new double[
+                            distortionCoefficients.rows() * distortionCoefficients.cols()];
                     distortionCoefficients.get(0, 0, distortionCoefficientsArray);
                     mTable.putNumberArray("cameraMatrix", cameraMatrixArray);
                     mTable.putNumberArray("distortionCoefficients", distortionCoefficientsArray);
-                    mTable.putNumberArray("calibrationResolution", new double[]{mImageSize.width, mImageSize.height});
+                    mTable.putNumberArray("calibrationResolution",
+                            new double[]{mImageSize.width, mImageSize.height});
                 }
             }
         });
@@ -192,7 +195,8 @@ public class Calibration {
     private void renderFrame(Mat rgbaFrame) {
         drawPoints(rgbaFrame);
 
-        Imgproc.putText(rgbaFrame, "Captured: " + mCornersBuffer.size(), new Point(0, rgbaFrame.rows() * 0.1),
+        Imgproc.putText(rgbaFrame, "Captured: " + mCornersBuffer.size(),
+                new Point(0, rgbaFrame.rows() * 0.1),
                 Core.FONT_HERSHEY_SIMPLEX, 1.0, new Scalar(255, 255, 0));
     }
 

@@ -21,7 +21,8 @@ import android.util.AttributeSet;
 import android.view.TextureView;
 
 /**
- * A {@link TextureView} that can be adjusted to a specified aspect ratio.
+ * Used verbatim from Google's example. This is the component that displays the camera view on
+ * screen
  */
 public class AutoFitTextureView extends TextureView {
 

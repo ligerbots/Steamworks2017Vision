@@ -5,6 +5,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
 
+/**
+ * This is a BroadcastReceiver that starts the main activity when it's triggered. It's triggered
+ * by the 5 second alarm that is constantly set while the app is running
+ * @see CrashRestarter
+ */
 public class AlarmReceiver extends BroadcastReceiver {
     public AlarmReceiver() {
     }

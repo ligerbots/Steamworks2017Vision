@@ -60,13 +60,17 @@ public class ImageProcessor implements Runnable {
             }
 
             if(mProcessingLargestContour != null) {
-                Imgproc.drawContours(drawingRgbMat, Collections.singletonList(mProcessingLargestContour), 0, new Scalar(255, 0, 0));
+                Imgproc.drawContours(drawingRgbMat,
+                        Collections.singletonList(mProcessingLargestContour), 0,
+                        new Scalar(255, 0, 0));
             }
             if(mProcessingPolyFit != null) {
                 org.opencv.core.Point[] localCopy = mProcessingPolyFit;
                 for(int i=0; i<localCopy.length; ++i) {
-                    Imgproc.line(drawingRgbMat, localCopy[i], localCopy[(i+1)%localCopy.length], new Scalar(0, 255, 0));
-                    Imgproc.putText(drawingRgbMat, Integer.toString(i), localCopy[i], Core.FONT_HERSHEY_PLAIN, 2, new Scalar(0, 0, 255));
+                    Imgproc.line(drawingRgbMat, localCopy[i], localCopy[(i+1)%localCopy.length],
+                            new Scalar(0, 255, 0));
+                    Imgproc.putText(drawingRgbMat, Integer.toString(i), localCopy[i],
+                            Core.FONT_HERSHEY_PLAIN, 2, new Scalar(0, 0, 255));
                 }
             }
         }
@@ -90,7 +94,8 @@ public class ImageProcessor implements Runnable {
                 // send image histogram
                 mFilterColorRange.setHistogram(mProcessingHsvMat);
                 // Filter HSV by color specified by seek bar
-                Core.inRange(mProcessingHsvMat, mFilterColorRange.getLower(), mFilterColorRange.getUpper(), mProcessingHsvMat);
+                Core.inRange(mProcessingHsvMat, mFilterColorRange.getLower(),
+                        mFilterColorRange.getUpper(), mProcessingHsvMat);
                 // smoothen it out
                 //Imgproc.medianBlur(mProcessingHsvMat, mProcessingHsvMat, 11);
 
@@ -98,7 +103,8 @@ public class ImageProcessor implements Runnable {
                 List<MatOfPoint> contours = new ArrayList<>();
                 Mat hierarchy = new Mat();
                 Mat contourCopy = mProcessingHsvMat.clone();
-                Imgproc.findContours(contourCopy, contours, hierarchy, Imgproc.RETR_CCOMP, Imgproc.CHAIN_APPROX_SIMPLE);
+                Imgproc.findContours(contourCopy, contours, hierarchy, Imgproc.RETR_CCOMP,
+                        Imgproc.CHAIN_APPROX_SIMPLE);
 
                 // search for largest contour
                 double largestArea = 0;
@@ -174,7 +180,8 @@ public class ImageProcessor implements Runnable {
                         org.opencv.core.Point[] polyFitPoint = polyFit.toArray();
                         Arrays.sort(polyFitPoint, new Comparator<Point>() {
                             @Override
-                            public int compare(org.opencv.core.Point point1, org.opencv.core.Point point2) {
+                            public int compare(org.opencv.core.Point point1,
+                                               org.opencv.core.Point point2) {
                                 return Double.compare(point1.x, point2.x);
                             }
                         });
@@ -196,13 +203,14 @@ public class ImageProcessor implements Runnable {
                         MatOfPoint3f objPoints = new MatOfPoint3f();
                         objPoints.fromArray(
                                 new Point3(0, 0, 0),
-                                new Point3(0, 12, 0),
-                                new Point3(18, 12, 0),
-                                new Point3(18, 0, 0)
+                                new Point3(0, 8, 0),
+                                new Point3(12, 8, 0),
+                                new Point3(12, 0, 0)
                         );
 
                         double[] cameraMatrixA = mCalibration.getCameraMatrixArray();
-                        double[] distortionCoefficientsA = mCalibration.getDistortionCoefficientsArray();
+                        double[] distortionCoefficientsA =
+                                mCalibration.getDistortionCoefficientsArray();
 
                         if(cameraMatrixA.length > 0 && distortionCoefficientsA.length > 0) {
                             Mat cameraMatrix = new Mat();
@@ -221,7 +229,8 @@ public class ImageProcessor implements Runnable {
                                 distortCoeff.put(i, 0, distortionCoefficientsA[i]);
                             }
 
-                            Calib3d.solvePnP(objPoints, polyFit, cameraMatrix, distortCoeff, rvec, tvec);
+                            Calib3d.solvePnP(objPoints, polyFit, cameraMatrix, distortCoeff,
+                                    rvec, tvec);
 
                             Mat rmat = new Mat();
 
@@ -229,10 +238,13 @@ public class ImageProcessor implements Runnable {
                             rvec.release();
                             rvec = new Mat(1, 3, CvType.CV_64F);
                             rvec.put(0, 0,
-                                    Core.fastAtan2((float) rmat.get(1, 2)[0], (float) rmat.get(2, 2)[0]),
+                                    Core.fastAtan2((float) rmat.get(1, 2)[0],
+                                            (float) rmat.get(2, 2)[0]),
                                     Core.fastAtan2((float) -rmat.get(2, 0)[0],
-                                            (float) Math.sqrt(rmat.get(1, 2)[0]*rmat.get(1, 2)[0] + rmat.get(2, 2)[0]*rmat.get(2, 2)[0])),
-                                    Core.fastAtan2((float) rmat.get(1, 0)[0], (float) rmat.get(0, 0)[0])
+                                            (float) Math.sqrt(rmat.get(1, 2)[0]*rmat.get(1, 2)[0]
+                                                    + rmat.get(2, 2)[0]*rmat.get(2, 2)[0])),
+                                    Core.fastAtan2((float) rmat.get(1, 0)[0],
+                                            (float) rmat.get(0, 0)[0])
                             );
 
                             double[] rvecDouble = new double[(int) rvec.total()];
@@ -246,7 +258,8 @@ public class ImageProcessor implements Runnable {
                             result.putNumber("tvec_x", tvecDouble[0]);
                             result.putNumber("tvec_y", tvecDouble[1]);
                             result.putNumber("tvec_z", tvecDouble[2]);
-                            Communications.dataServerSendData(rvecDouble[0], rvecDouble[1], rvecDouble[2], tvecDouble[0], tvecDouble[1], tvecDouble[2]);
+                            Communications.dataServerSendData(rvecDouble[0], rvecDouble[1],
+                                    rvecDouble[2], tvecDouble[0], tvecDouble[1], tvecDouble[2]);
                         }
                     }
                 }

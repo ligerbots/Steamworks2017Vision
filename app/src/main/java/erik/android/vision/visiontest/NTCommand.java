@@ -4,6 +4,9 @@ import edu.wpi.first.wpilibj.networktables.NetworkTable;
 import edu.wpi.first.wpilibj.tables.ITable;
 import edu.wpi.first.wpilibj.tables.ITableListener;
 
+/**
+ * Equivalent to WPILib's <code>Command</code>, except that it runs a {@link Runnable}
+ */
 public class NTCommand extends ITableListener implements Runnable {
     private Runnable mAction;
     private String mName;

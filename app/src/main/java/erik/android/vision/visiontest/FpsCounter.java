@@ -3,6 +3,9 @@ package erik.android.vision.visiontest;
 
 import android.util.Log;
 
+/**
+ * Counts FPS
+ */
 public class FpsCounter {
     private static final String TAG = "FpsCounter";
 
