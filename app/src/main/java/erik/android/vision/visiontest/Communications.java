@@ -47,6 +47,7 @@ public class Communications {
         NetworkTable.setIPAddress("Erik-PC"); // TODO: change to roboRIO!
         NetworkTable.setPersistentFilename(PERSISTENT_FILENAME);
         NetworkTable.initialize();
+        Parameters.initDefaultVariables();
     }
 
     public static void closeNetworkTables() {

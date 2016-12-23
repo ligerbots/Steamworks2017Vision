@@ -5,6 +5,7 @@ import android.graphics.ImageFormat;
 import android.util.Range;
 import android.util.Size;
 
+import edu.wpi.first.wpilibj.networktables.NetworkTable;
 import edu.wpi.first.wpilibj.tables.ITable;
 import edu.wpi.first.wpilibj.tables.ITableListener;
 
@@ -12,6 +13,10 @@ import edu.wpi.first.wpilibj.tables.ITableListener;
  * Stores constants and runtime parameters
  */
 public class Parameters {
+    public static final double DEFAULT_CALIB_DOT_SPACING = 4.15625; // in
+    public static final double DEFAULT_TARGET_WIDTH = 12.0; // in
+    public static final double DEFAULT_TARGET_HEIGHT = 8.0; // in
+
     public static final int MAX_PREVIEW_WIDTH = 1920;
     public static final int MAX_PREVIEW_HEIGHT = 1080;
 
@@ -24,6 +29,8 @@ public class Parameters {
     public static NTBoundedNumber sensitivity;
     public static NTBoundedNumber exposureTime;
 
+    private static ITable targetSizeTable;
+
     private static Runnable cameraParametersUpdateRunnable;
     private static ITableListener refresh = new ITableListener() {
         @Override
@@ -33,6 +40,25 @@ public class Parameters {
             }
         }
     };
+
+    public static void initDefaultVariables() {
+        ITable calibTable = NetworkTable.getTable(Calibration.TABLE_NAME);
+        if(!calibTable.containsKey("squareSize"))
+            calibTable.putNumber("squareSize", DEFAULT_CALIB_DOT_SPACING);
+
+        targetSizeTable = NetworkTable.getTable("Vision/target");
+        if(!targetSizeTable.containsKey("width"))
+            targetSizeTable.putNumber("width", DEFAULT_TARGET_WIDTH);
+        if(!targetSizeTable.containsKey("height"))
+            targetSizeTable.putNumber("height", DEFAULT_TARGET_HEIGHT);
+    }
+
+    public static double[] getTargetSize() {
+        return new double[]{
+                targetSizeTable.getNumber("width", DEFAULT_TARGET_WIDTH),
+                targetSizeTable.getNumber("height", DEFAULT_TARGET_HEIGHT)
+        };
+    }
 
     public static void initCameraParameters(Range<Integer> camSensitivityRange,
                                             Range<Long> camExposureTimeRange) {

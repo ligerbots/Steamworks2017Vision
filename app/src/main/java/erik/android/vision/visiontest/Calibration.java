@@ -22,7 +22,7 @@ import edu.wpi.first.wpilibj.tables.ITable;
 
 public class Calibration {
     private static final String TAG = "Calibration";
-    private static final String TABLE_NAME = "Vision/Calibration";
+    public static final String TABLE_NAME = "Vision/Calibration";
 
     private final Size mPatternSize = new Size(4, 11);
     private final int mCornersSize = (int)(mPatternSize.width * mPatternSize.height);
@@ -68,7 +68,7 @@ public class Calibration {
             @Override
             public void run() {
                 if(mTable.getBoolean("enableCalibration", false)) {
-                    calibrate((float) mTable.getNumber("squareSize", 0.669291));
+                    calibrate((float) mTable.getNumber("squareSize", Parameters.DEFAULT_CALIB_DOT_SPACING));
                     Mat cameraMatrix = getCameraMatrix();
                     Mat distortionCoefficients = getDistortionCoefficients();
                     double[] cameraMatrixArray =

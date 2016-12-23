@@ -3,6 +3,8 @@ package erik.android.vision.visiontest;
 
 import android.util.Log;
 
+import edu.wpi.first.wpilibj.networktables.NetworkTable;
+
 /**
  * Counts FPS
  */
@@ -29,6 +31,7 @@ public class FpsCounter {
             Log.i(TAG, mName + ": " + mFps);
             mLastTime = System.currentTimeMillis();
             mFrameCount = 0;
+            NetworkTable.getTable("Vision").putNumber("fps_" + mName, mFps);
         }
     }
 
