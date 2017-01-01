@@ -187,6 +187,7 @@ public class Camera2Activity extends AppCompatActivity {
             // send the image to SmartDashboard at a lower resolution
             Imgproc.pyrDown(imageRgbMat, imageRgbMat);
             Communications.cameraServerSendImage(imageRgbMat);
+            Communications.sendBatteryLevel(Camera2Activity.this);
 
             nv21Mat.release();
             img.close();

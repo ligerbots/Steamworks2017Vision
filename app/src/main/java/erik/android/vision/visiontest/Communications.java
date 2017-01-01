@@ -3,6 +3,7 @@ package erik.android.vision.visiontest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.BatteryManager;
 import android.util.Log;
 
 import org.opencv.core.Mat;
@@ -13,8 +14,8 @@ import org.opencv.imgcodecs.Imgcodecs;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.util.Enumeration;
@@ -35,19 +36,27 @@ public class Communications {
     public static final int CS_STREAM_PORT = 5810;
     public static final byte[] CS_MAGIC_NUMBER = new byte[]{1, 0, 0, 0};
     public static final int DATA_PORT = 5808;
+    public static final String ROBORIO_ADDRESS = "roborio-2877-frc";
 
-    protected static InetAddress broadcastAddress = null;
+    protected static InetAddress roboRioAddress = null;
+    protected static InetSocketAddress roboRioDataAddress = null;
+    protected static InetSocketAddress roboRioCameraStreamAddress = null;
     protected static DatagramChannel udpCameraServerChannel = null;
     protected static MatOfByte sendBuffer = new MatOfByte();
     protected static long lastSendTime = 0;
+    protected static long lastHeardFromRio = 0;
+
+    protected static NetworkTable root;
 
     public static void initNetworkTables() {
         NetworkTable.setClientMode();
         NetworkTable.setNetworkIdentity(IDENTITY);
-        NetworkTable.setIPAddress("roborio-2877-frc");
+        NetworkTable.setIPAddress(ROBORIO_ADDRESS);
         NetworkTable.setPersistentFilename(PERSISTENT_FILENAME);
         NetworkTable.initialize();
         Parameters.initDefaultVariables();
+
+        root = NetworkTable.getTable("Vision");
     }
 
     public static void closeNetworkTables() {
@@ -60,17 +69,27 @@ public class Communications {
 
     public static void initCameraServer() {
         try {
-            findBroadcastAddress();
+            findRoboRioAddress();
 
             if(udpCameraServerChannel != null) {
                 return;
             }
 
             udpCameraServerChannel = DatagramChannel.open();
-            udpCameraServerChannel.socket().setBroadcast(true);
+            //udpCameraServerChannel.socket().setBroadcast(true);
             udpCameraServerChannel.socket().setReuseAddress(true);
             udpCameraServerChannel.socket().bind(new InetSocketAddress(CS_CONTROL_PORT));
             udpCameraServerChannel.configureBlocking(true);
+
+            Thread receiver = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    cameraServerReceiverThread();
+                }
+            });
+            receiver.setDaemon(true);
+            receiver.setName("Camera Server Feedback Thread");
+            receiver.start();
         } catch(Exception e) {
             Log.e(TAG, "UDP error", e);
         }
@@ -87,6 +106,11 @@ public class Communications {
 
     public static void dataServerSendData(double rvec_0, double rvec_1, double rvec_2,
                                           double tvec_0, double tvec_1, double tvec_2) {
+        checkRoboRioAddress();
+        if(roboRioDataAddress == null) {
+            return;
+        }
+
         ByteBuffer packet = ByteBuffer.allocateDirect(Double.SIZE / 8 * 6);
         packet.position(0);
         packet.putDouble(rvec_0);
@@ -96,9 +120,15 @@ public class Communications {
         packet.putDouble(tvec_1);
         packet.putDouble(tvec_2);
         try {
-            udpCameraServerChannel.send(packet, new InetSocketAddress(broadcastAddress, DATA_PORT));
+            udpCameraServerChannel.send(packet, roboRioDataAddress);
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    protected static void checkRoboRioAddress() {
+        if(roboRioAddress == null || System.currentTimeMillis() - lastHeardFromRio > 2000) {
+            findRoboRioAddress();
         }
     }
 
@@ -107,11 +137,10 @@ public class Communications {
             return;
         }*/
         lastSendTime = System.currentTimeMillis();
-        if(broadcastAddress == null) {
-            findBroadcastAddress();
-            if(broadcastAddress == null) {
-                return;
-            }
+
+        checkRoboRioAddress();
+        if(roboRioCameraStreamAddress == null) {
+            return;
         }
 
         Log.i(TAG, "Image size: "
@@ -128,34 +157,75 @@ public class Communications {
         AppNative.copyMatOfByteToCameraServerPacket(packet, sendBuffer.getNativeObjAddr());
         try {
             udpCameraServerChannel.send(packet,
-                    new InetSocketAddress(broadcastAddress, CS_STREAM_PORT));
+                    roboRioCameraStreamAddress);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    /**
-     * Finds the USB networking interface (rndis0) and gets the broadcast address
-     */
-    protected static void findBroadcastAddress() {
-        if(broadcastAddress != null) return;
+    public static void cameraServerReceiverThread() {
+        ByteBuffer buf;
+        try {
+            buf = ByteBuffer.allocateDirect(udpCameraServerChannel.socket().getReceiveBufferSize());
+        } catch(Exception e) {
+            Log.e(TAG, "UDP error", e);
+            return;
+        }
+        while(udpCameraServerChannel.isOpen()) {
+            try {
+                SocketAddress from = udpCameraServerChannel.receive(buf);
+                if(from != null) {
+                    lastHeardFromRio = System.currentTimeMillis();
+                }
+            } catch(Exception e) {
+                Log.e(TAG, "UDP error", e);
+            }
+        }
+    }
+
+    public static void sendBatteryLevel(Context ctx) {
+        root.putNumber("battery", getBatteryLevel(ctx));
+    }
+
+    protected static double getBatteryLevel(Context ctx) {
+        Intent batteryIntent = ctx.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        int level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+        int scale = batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+
+        // Error checking that probably isn't needed but I added just in case.
+        if(level == -1 || scale == -1) {
+            return -1;
+        }
+
+        return (level * 100.0) / scale;
+    }
+
+    protected static void findRoboRioAddress() {
+        try {
+            roboRioAddress = InetAddress.getByName(ROBORIO_ADDRESS);
+            roboRioCameraStreamAddress = new InetSocketAddress(roboRioAddress, CS_STREAM_PORT);
+            roboRioDataAddress = new InetSocketAddress(roboRioAddress, DATA_PORT);
+        } catch(Exception e) {
+            Log.e(TAG, "Network error", e);
+            roboRioAddress = null;
+            roboRioCameraStreamAddress = null;
+            roboRioDataAddress = null;
+        }
+    }
+
+    protected static NetworkInterface findUsbTetheringInterface() {
         try {
             Enumeration<NetworkInterface> allInterfaces = NetworkInterface.getNetworkInterfaces();
             while (allInterfaces.hasMoreElements()) {
                 NetworkInterface networkInterface = allInterfaces.nextElement();
                 if(networkInterface.getName().equals("rndis0") && networkInterface.isUp()) {
-                    for(InterfaceAddress addr : networkInterface.getInterfaceAddresses()) {
-                        if(addr == null) continue;
-                        InetAddress bcast = addr.getBroadcast();
-                        if(bcast == null) continue;
-                        Log.i(TAG, "Broadcast address: " + bcast.toString());
-                        broadcastAddress = bcast;
-                    }
+                    return networkInterface;
                 }
             }
         } catch(Exception e) {
             Log.e(TAG, "Network error", e);
         }
+        return null;
     }
 
     /**
@@ -169,7 +239,7 @@ public class Communications {
             public void run() {
                 // keep polling until USB is up
                 while(true) {
-                    if (isUsbConnected(context)) {
+                    if (isUsbConnected(context) && findUsbTetheringInterface() == null) {
                         try {
                             Thread.sleep(3000);
                         } catch (InterruptedException e) {
@@ -179,7 +249,6 @@ public class Communications {
                         try {
                             Log.i(TAG, "Enabling tethering");
                             Runtime.getRuntime().exec("su -c service call connectivity 30 i32 1");
-                            return;
                         } catch(Exception e) {
                             Log.e(TAG, "Error enabling tethering", e);
                         }
