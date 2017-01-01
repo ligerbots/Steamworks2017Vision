@@ -44,7 +44,7 @@ public class Communications {
     public static void initNetworkTables() {
         NetworkTable.setClientMode();
         NetworkTable.setNetworkIdentity(IDENTITY);
-        NetworkTable.setIPAddress("PAD"); // TODO: change to roboRIO!
+        NetworkTable.setIPAddress("roborio-2877-frc");
         NetworkTable.setPersistentFilename(PERSISTENT_FILENAME);
         NetworkTable.initialize();
         Parameters.initDefaultVariables();
