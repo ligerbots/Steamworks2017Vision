@@ -184,10 +184,6 @@ public class Communications {
         }
     }
 
-    public static void sendBatteryLevel(Context ctx) {
-        root.putNumber("battery", getBatteryLevel(ctx));
-    }
-
     protected static double getBatteryLevel(Context ctx) {
         Intent batteryIntent = ctx.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         int level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
@@ -199,6 +195,49 @@ public class Communications {
         }
 
         return (level * 100.0) / scale;
+    }
+
+    protected static boolean isCharging(Context ctx) {
+        IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        Intent batteryStatus = ctx.registerReceiver(null, ifilter);
+        int status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+        boolean isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                status == BatteryManager.BATTERY_STATUS_FULL;
+        return isCharging;
+    }
+
+    public static void initBatteryMonitor(final Context ctx) {
+        Thread batteryMonitorThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                long lastChargeTime = System.currentTimeMillis();
+                while(true) {
+                    root.putNumber("battery", getBatteryLevel(ctx));
+
+                    if(isCharging(ctx)) {
+                        lastChargeTime = System.currentTimeMillis();
+                    } else {
+                        if(System.currentTimeMillis() - lastChargeTime > 1000 * 60 * 2) {
+                            try {
+                                Log.i(TAG, "Shutting down");
+                                Runtime.getRuntime().exec("su -c reboot -p");
+                            } catch(Exception e) {
+                                Log.e(TAG, "Error shutting down", e);
+                            }
+                        }
+                    }
+
+                    try {
+                        Thread.sleep(1000);
+                    } catch(Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        });
+        batteryMonitorThread.setName("Battery Monitor Thread");
+        batteryMonitorThread.setDaemon(true);
+        batteryMonitorThread.start();
     }
 
     protected static void findRoboRioAddress() {
