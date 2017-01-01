@@ -44,7 +44,7 @@ public class Communications {
     public static void initNetworkTables() {
         NetworkTable.setClientMode();
         NetworkTable.setNetworkIdentity(IDENTITY);
-        NetworkTable.setIPAddress("Erik-PC"); // TODO: change to roboRIO!
+        NetworkTable.setIPAddress("PAD"); // TODO: change to roboRIO!
         NetworkTable.setPersistentFilename(PERSISTENT_FILENAME);
         NetworkTable.initialize();
         Parameters.initDefaultVariables();
@@ -170,6 +170,11 @@ public class Communications {
                 // keep polling until USB is up
                 while(true) {
                     if (isUsbConnected(context)) {
+                        try {
+                            Thread.sleep(3000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
                         // http://stackoverflow.com/a/24346101/1021196
                         try {
                             Log.i(TAG, "Enabling tethering");

@@ -179,13 +179,10 @@ public class Camera2Activity extends AppCompatActivity {
             Imgproc.cvtColor(nv21Mat, imageBgrMat, Imgproc.COLOR_YUV2BGR_NV12, 3);
             Mat imageRgbMat = new Mat();
             Imgproc.cvtColor(imageBgrMat, imageRgbMat, Imgproc.COLOR_BGR2RGB);
+            Mat imageGrayMat = nv21Mat.submat(0, mRgbHeight, 0, mRgbWidth);
 
             // draw over the image using processing data
             mImageProcessor.postUpdateAndDraw(imageBgrMat, imageRgbMat);
-
-            if(mCalibration.isEnabled()) {
-                mCalibration.processFrame(nv21Mat.submat(0, mRgbHeight, 0, mRgbWidth), imageRgbMat);
-            }
 
             // send the image to SmartDashboard at a lower resolution
             Imgproc.pyrDown(imageRgbMat, imageRgbMat);

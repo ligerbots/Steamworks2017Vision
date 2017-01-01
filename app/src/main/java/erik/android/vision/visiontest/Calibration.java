@@ -2,6 +2,9 @@ package erik.android.vision.visiontest;
 
 import android.util.Log;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.opencv.calib3d.Calib3d;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
@@ -14,6 +17,11 @@ import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,6 +31,7 @@ import edu.wpi.first.wpilibj.tables.ITable;
 public class Calibration {
     private static final String TAG = "Calibration";
     public static final String TABLE_NAME = "Vision/Calibration";
+    private static final String SAVE_LOCATION = "/storage/emulated/0/cameraparameters.json";
 
     private final Size mPatternSize = new Size(4, 11);
     private final int mCornersSize = (int)(mPatternSize.width * mPatternSize.height);
@@ -54,6 +63,25 @@ public class Calibration {
         mTable = NetworkTable.getTable(TABLE_NAME);
 
         mTable.putBoolean("enableCalibration", false);
+        mTable.putBoolean("calibrationPatternFound", false);
+        mTable.putNumber("cornersCount", 0);
+
+        if(new File(SAVE_LOCATION).exists()) {
+            try {
+                FileReader in = new FileReader(SAVE_LOCATION);
+                StringBuilder b = new StringBuilder();
+                char[] buf = new char[1024];
+                int len;
+                while((len = in.read(buf)) != -1) {
+                    b.append(buf, 0, len);
+                }
+                JSONObject obj = new JSONObject(b.toString());
+                mTable.putNumberArray("cameraMatrix", jsonArrayToDouble(obj.getJSONArray("cameraMatrix")));
+                mTable.putNumberArray("distortionCoefficients", jsonArrayToDouble(obj.getJSONArray("distortionCoefficients")));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
 
         new NTCommand(TABLE_NAME + "/TakeFrame", "CalibrationTakeFrame", new Runnable() {
             @Override
@@ -81,9 +109,35 @@ public class Calibration {
                     mTable.putNumberArray("distortionCoefficients", distortionCoefficientsArray);
                     mTable.putNumberArray("calibrationResolution",
                             new double[]{mImageSize.width, mImageSize.height});
+                    JSONObject obj = new JSONObject();
+                    try {
+                        obj.put("cameraMatrix", doubleToJsonArray(cameraMatrixArray));
+                        obj.put("distortionCoefficients", doubleToJsonArray(distortionCoefficientsArray));
+                        FileWriter out = new FileWriter(SAVE_LOCATION);
+                        out.write(obj.toString());
+                        out.close();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
             }
         });
+    }
+
+    private double[] jsonArrayToDouble(JSONArray arr) throws JSONException {
+        double[] ret = new double[arr.length()];
+        for(int i = 0; i < arr.length(); i++) {
+            ret[i] = arr.getDouble(i);
+        }
+        return ret;
+    }
+
+    private JSONArray doubleToJsonArray(double[] arr) throws JSONException {
+        JSONArray ret = new JSONArray();
+        for(int i = 0; i < arr.length; i++) {
+            ret.put(i, arr[i]);
+        }
+        return ret;
     }
 
     public double[] getCameraMatrixArray() {
@@ -177,9 +231,11 @@ public class Calibration {
         return Math.sqrt(totalError / totalPoints);
     }
 
-    private void findPattern(Mat grayFrame) {
+    public void findPattern(Mat grayFrame) {
         mPatternWasFound = Calib3d.findCirclesGrid(grayFrame, mPatternSize,
                 mCorners, Calib3d.CALIB_CB_ASYMMETRIC_GRID);
+        mTable.putBoolean("calibrationPatternFound", mPatternWasFound);
+        mTable.putNumber("cornersCount", mCornersBuffer.size());
     }
 
     public void addCorners() {
@@ -192,7 +248,7 @@ public class Calibration {
         Calib3d.drawChessboardCorners(rgbaFrame, mPatternSize, mCorners, mPatternWasFound);
     }
 
-    private void renderFrame(Mat rgbaFrame) {
+    public void renderFrame(Mat rgbaFrame) {
         drawPoints(rgbaFrame);
 
         Imgproc.putText(rgbaFrame, "Captured: " + mCornersBuffer.size(),

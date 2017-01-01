@@ -34,9 +34,13 @@ public class ImageProcessor implements Runnable {
     private MatOfPoint mProcessingLargestContour = null;
     private Point[] mProcessingPolyFit = null;
 
+    private Mat mCalibGrayMat = null;
+
     private NTColorPicker mFilterColorRange;
     private FpsCounter mProcessingFps;
     private Calibration mCalibration;
+
+
 
     public ImageProcessor(Calibration calibration) {
         mFilterColorRange = new NTColorPicker("Vision/colorRange", NTColorPicker.ColorMode.HSV);
@@ -56,6 +60,13 @@ public class ImageProcessor implements Runnable {
                     mProcessingHsvMat = new Mat();
                 }
                 Imgproc.cvtColor(sourceBgrMat, mProcessingHsvMat, Imgproc.COLOR_RGB2HSV);
+                if(mCalibGrayMat == null) {
+                    mCalibGrayMat = new Mat();
+                }
+                if(mCalibration.isEnabled()) {
+                    Imgproc.cvtColor(sourceBgrMat, mCalibGrayMat, Imgproc.COLOR_BGR2GRAY);
+                    //mCalibration.renderFrame(drawingRgbMat);
+                }
                 mProcessingLock.notify();
             }
 
@@ -91,6 +102,10 @@ public class ImageProcessor implements Runnable {
                 }
                 Log.i(TAG, "Processing thread loop");
                 long st = System.currentTimeMillis();
+                // if calibration is enabled, do it
+                if(mCalibration.isEnabled()) {
+                    mCalibration.findPattern(mCalibGrayMat);
+                }
                 // send image histogram
                 mFilterColorRange.setHistogram(mProcessingHsvMat);
                 // Filter HSV by color specified by seek bar
