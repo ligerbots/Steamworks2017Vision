@@ -20,6 +20,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.util.Enumeration;
 
+import edu.wpi.first.wpilibj.networktables.ConnectionInfo;
 import edu.wpi.first.wpilibj.networktables.NetworkTable;
 import edu.wpi.first.wpilibj.networktables.NetworkTablesJNI;
 import erik.android.vision.visiontest_native.AppNative;
@@ -202,11 +203,21 @@ public class Communications {
 
     protected static void findRoboRioAddress() {
         try {
-            roboRioAddress = InetAddress.getByName(ROBORIO_ADDRESS);
+            ConnectionInfo[] connectionInfos = NetworkTablesJNI.getConnections();
+            ConnectionInfo robotInfo = null;
+            for(ConnectionInfo connectionInfo: connectionInfos) {
+                if(connectionInfo.remote_id.equals("Robot")) {
+                    robotInfo = connectionInfo;
+                    break;
+                }
+            }
+            if(robotInfo == null) return;
+
+            roboRioAddress = InetAddress.getByName(robotInfo.remote_ip);
             roboRioCameraStreamAddress = new InetSocketAddress(roboRioAddress, CS_STREAM_PORT);
             roboRioDataAddress = new InetSocketAddress(roboRioAddress, DATA_PORT);
         } catch(Exception e) {
-            Log.e(TAG, "Network error", e);
+            Log.e(TAG, "Network error resolving roborio", e);
             roboRioAddress = null;
             roboRioCameraStreamAddress = null;
             roboRioDataAddress = null;
@@ -223,7 +234,7 @@ public class Communications {
                 }
             }
         } catch(Exception e) {
-            Log.e(TAG, "Network error", e);
+            Log.e(TAG, "Network error finding rndis0", e);
         }
         return null;
     }

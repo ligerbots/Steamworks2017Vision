@@ -218,10 +218,10 @@ public class ImageProcessor implements Runnable {
                         MatOfPoint3f objPoints = new MatOfPoint3f();
                         double[] targetSize = Parameters.getTargetSize();
                         objPoints.fromArray(
-                                new Point3(0, 0, 0),
-                                new Point3(0, targetSize[1], 0),
-                                new Point3(targetSize[0], targetSize[1], 0),
-                                new Point3(targetSize[0], 0, 0)
+                                new Point3(-targetSize[0]/2, -targetSize[1]/2, 0),
+                                new Point3(-targetSize[0]/2,  targetSize[1]/2, 0),
+                                new Point3( targetSize[0]/2,  targetSize[1]/2, 0),
+                                new Point3( targetSize[0]/2, -targetSize[1]/2, 0)
                         );
 
                         double[] cameraMatrixA = mCalibration.getCameraMatrixArray();

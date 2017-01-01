@@ -44,6 +44,9 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
+import edu.wpi.first.wpilibj.networktables.NetworkTable;
+import edu.wpi.first.wpilibj.tables.ITable;
+import edu.wpi.first.wpilibj.tables.ITableListener;
 import erik.android.vision.visiontest_native.AppNative;
 
 /**
@@ -273,6 +276,23 @@ public class Camera2Activity extends AppCompatActivity {
             }
         });
 
+        Communications.root.putBoolean("enabled", false);
+        Communications.root.addTableListener("enabled", new ITableListener() {
+            @Override
+            public void valueChanged(ITable source, String key, final Object value, boolean isNew) {
+                Camera2Activity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if(value.equals(Boolean.TRUE)) {
+                            enableProcessing();
+                        } else {
+                            enableLowPowerMode();
+                        }
+                    }
+                });
+            }
+        }, true);
+
         Log.i(TAG, "Phone info " + Build.MANUFACTURER + " " + Build.MODEL);
 
         if(!Build.MANUFACTURER.equals("LGE") || !Build.MODEL.equals("Nexus 5")) {
@@ -298,6 +318,23 @@ public class Camera2Activity extends AppCompatActivity {
     @Override
     public void onResume() {
         super.onResume();
+        if(Communications.root.getBoolean("enabled", false)) {
+            enableProcessing();
+        }
+    }
+
+    @Override
+    public void onPause() {
+        enableLowPowerMode();
+        super.onPause();
+    }
+
+    public void enableLowPowerMode() {
+        closeCamera();
+        stopBackgroundThread();
+    }
+
+    public void enableProcessing() {
         startBackgroundThread();
 
         // When the screen is turned off and turned back on, the SurfaceTexture is already
@@ -309,13 +346,6 @@ public class Camera2Activity extends AppCompatActivity {
         } else {
             mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
         }
-    }
-
-    @Override
-    public void onPause() {
-        closeCamera();
-        stopBackgroundThread();
-        super.onPause();
     }
 
     private void setUpCameraOutputs(int width, int height) {
@@ -510,6 +540,7 @@ public class Camera2Activity extends AppCompatActivity {
     }
 
     private void stopBackgroundThread() {
+        if(mBackgroundThread == null) return;
         mBackgroundThread.quitSafely();
         try {
             mBackgroundThread.join();
