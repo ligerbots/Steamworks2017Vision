@@ -40,12 +40,19 @@ public class ImageProcessor implements Runnable {
     private FpsCounter mProcessingFps;
     private Calibration mCalibration;
 
+    private List<MatOfPoint> contours = new ArrayList<>();
+    private Mat hierarchy = new Mat();
+    private MatOfInt hull = new MatOfInt();
+    private MatOfPoint2f contour2f = new MatOfPoint2f();
+    private MatOfPoint2f polyFit = new MatOfPoint2f();
 
+    private NetworkTable result;
 
     public ImageProcessor(Calibration calibration) {
         mFilterColorRange = new NTColorPicker("Vision/colorRange", NTColorPicker.ColorMode.HSV);
         mProcessingFps = new FpsCounter("ProcessingThread");
         mCalibration = calibration;
+        result = NetworkTable.getTable("Vision/result");
 
         mProcessingThread = new Thread(this);
         mProcessingThread.setName("OpenCV Image Processor");
@@ -115,8 +122,11 @@ public class ImageProcessor implements Runnable {
                 //Imgproc.medianBlur(mProcessingHsvMat, mProcessingHsvMat, 11);
 
                 // find contours
-                List<MatOfPoint> contours = new ArrayList<>();
-                Mat hierarchy = new Mat();
+
+                for(MatOfPoint mat: contours) {
+                    mat.release();
+                }
+                contours.clear();
                 Mat contourCopy = mProcessingHsvMat.clone();
                 Imgproc.findContours(contourCopy, contours, hierarchy, Imgproc.RETR_CCOMP,
                         Imgproc.CHAIN_APPROX_SIMPLE);
@@ -132,27 +142,11 @@ public class ImageProcessor implements Runnable {
                     }
                 }
 
-                MatOfPoint2f polyFit = new MatOfPoint2f();
                 if (largestContour != null) {
-                    MatOfInt hull = new MatOfInt();
                     Imgproc.convexHull(largestContour, hull);
 
-                    // convert contour to its convex hull
-                    MatOfPoint mopOut = new MatOfPoint();
-                    mopOut.create((int) hull.size().height, 1, CvType.CV_32SC2);
-
-                    for (int i = 0; i < hull.size().height; i++) {
-                        int index = (int) hull.get(i, 0)[0];
-                        double[] point = new double[]{
-                                largestContour.get(index, 0)[0], largestContour.get(index, 0)[1]
-                        };
-                        mopOut.put(i, 0, point);
-                    }
-
-                    largestContour = mopOut;
-
                     // convert contour to MatOfPoint2f for approxPolyDP
-                    MatOfPoint2f contour2f = new MatOfPoint2f(largestContour.toArray());
+                    largestContour.convertTo(contour2f, CvType.CV_32SC2);
 
                     // play with epsilon until we get a quadrangle
                     // as we oscillate around the goal of 4 points, converge
@@ -267,7 +261,6 @@ public class ImageProcessor implements Runnable {
                             rvec.get(0, 0, rvecDouble);
                             double[] tvecDouble = new double[(int) tvec.total()];
                             tvec.get(0, 0, tvecDouble);
-                            NetworkTable result = NetworkTable.getTable("Vision/result");
                             result.putNumber("rvec_pitch", rvecDouble[0]);
                             result.putNumber("rvec_yaw", rvecDouble[1]);
                             result.putNumber("rvec_roll", rvecDouble[2]);

@@ -44,7 +44,6 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
-import edu.wpi.first.wpilibj.networktables.NetworkTable;
 import edu.wpi.first.wpilibj.tables.ITable;
 import edu.wpi.first.wpilibj.tables.ITableListener;
 import erik.android.vision.visiontest_native.AppNative;
@@ -85,6 +84,8 @@ public class Camera2Activity extends AppCompatActivity {
 
     // dimensions of the image in NV21 and RGB format
     private int mNv21Width, mNv21Height, mRgbWidth, mRgbHeight;
+    private Mat imageBgrMat = new Mat();
+    private Mat imageRgbMat = new Mat();
 
     // helper classes
     private Calibration mCalibration;
@@ -160,7 +161,7 @@ public class Camera2Activity extends AppCompatActivity {
 
 
     /**
-     * Recieves camera images and sends them to the image processor
+     * Receives camera images and sends them to the image processor
      */
     private final ImageReader.OnImageAvailableListener mOnImageAvailableListener
             = new ImageReader.OnImageAvailableListener() {
@@ -178,11 +179,8 @@ public class Camera2Activity extends AppCompatActivity {
 
             // now we need an RGB image
             Mat nv21Mat = new Mat(nv21MatPtr);
-            Mat imageBgrMat = new Mat();
             Imgproc.cvtColor(nv21Mat, imageBgrMat, Imgproc.COLOR_YUV2BGR_NV12, 3);
-            Mat imageRgbMat = new Mat();
             Imgproc.cvtColor(imageBgrMat, imageRgbMat, Imgproc.COLOR_BGR2RGB);
-            Mat imageGrayMat = nv21Mat.submat(0, mRgbHeight, 0, mRgbWidth);
 
             // draw over the image using processing data
             mImageProcessor.postUpdateAndDraw(imageBgrMat, imageRgbMat);

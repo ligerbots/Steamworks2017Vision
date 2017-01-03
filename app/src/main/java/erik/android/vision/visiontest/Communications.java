@@ -44,6 +44,7 @@ public class Communications {
     protected static InetSocketAddress roboRioCameraStreamAddress = null;
     protected static DatagramChannel udpCameraServerChannel = null;
     protected static MatOfByte sendBuffer = new MatOfByte();
+    protected static ByteBuffer csPacket = ByteBuffer.allocateDirect(1024*1024);
     protected static long lastSendTime = 0;
     protected static long lastHeardFromRio = 0;
 
@@ -149,16 +150,20 @@ public class Communications {
         Imgcodecs.imencode(".jpg", rgbFrame, sendBuffer,
                 new MatOfInt(Imgcodecs.CV_IMWRITE_JPEG_QUALITY, 80));
         int dataLength = sendBuffer.rows() * sendBuffer.cols();
-        ByteBuffer packet = ByteBuffer.allocateDirect(dataLength + 8);
-        packet.position(0);
-        packet.put(CS_MAGIC_NUMBER);
-        packet.putInt(dataLength);
-        packet.position(0);
+        if(dataLength + 8 > csPacket.capacity()) {
+            // should never happen, but let's not turn our poor memory into garbage anyway
+            Log.e(TAG, "Not enough CameraServer buffer space");
+            return;
+        }
+        csPacket.limit(dataLength + 8);
+        csPacket.position(0);
+        csPacket.put(CS_MAGIC_NUMBER);
+        csPacket.putInt(dataLength);
+        csPacket.position(0);
         // yay more native performance hacks
-        AppNative.copyMatOfByteToCameraServerPacket(packet, sendBuffer.getNativeObjAddr());
+        AppNative.copyMatOfByteToCameraServerPacket(csPacket, sendBuffer.getNativeObjAddr());
         try {
-            udpCameraServerChannel.send(packet,
-                    roboRioCameraStreamAddress);
+            udpCameraServerChannel.send(csPacket, roboRioCameraStreamAddress);
         } catch (IOException e) {
             e.printStackTrace();
         }
