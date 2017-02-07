@@ -22,8 +22,8 @@ public class Parameters {
     private static final String SAVE_FILE = "/storage/emulated/0/camerasettings.json";
 
     public static final double DEFAULT_CALIB_DOT_SPACING = 4.15625; // in
-    public static final double DEFAULT_TARGET_WIDTH = 12.0; // in
-    public static final double DEFAULT_TARGET_HEIGHT = 8.0; // in
+    public static final double DEFAULT_TARGET_WIDTH = 10.25; // in
+    public static final double DEFAULT_TARGET_HEIGHT = 5.0; // in
 
     public static final int MAX_PREVIEW_WIDTH = 1920;
     public static final int MAX_PREVIEW_HEIGHT = 1080;

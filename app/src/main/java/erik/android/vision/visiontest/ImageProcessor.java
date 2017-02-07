@@ -13,6 +13,7 @@ import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.MatOfPoint3f;
 import org.opencv.core.Point;
 import org.opencv.core.Point3;
+import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.imgproc.Moments;
@@ -227,17 +228,19 @@ public class ImageProcessor implements Runnable {
     }
 
     private boolean findGearTarget(Mat src) {
+        // filter out green
         Core.inRange(src, mFilterColorRange.getLower(),
                 mFilterColorRange.getUpper(), src);
 
-        releaseList(contours);
-
+        // detect all contours
         Mat contourCopy = src.clone();
         Imgproc.findContours(contourCopy, contours, hierarchy, Imgproc.RETR_CCOMP,
                 Imgproc.CHAIN_APPROX_SIMPLE);
 
         List<ContourInfo> combinedContours = new LinkedList<>();
 
+        // combine contours that are close to each other. This links together the contours that may
+        // be split up by the gear lift peg
         outer:
         while(contours.size() > 0) {
             MatOfPoint first = contours.remove(0);
@@ -255,6 +258,8 @@ public class ImageProcessor implements Runnable {
                 }
             }
 
+            // check if the entire contour is reasonably within bounds, otherwise we risk garbage
+            // values from a clipped target
             for (Point point: combined) {
                 double x = point.x;
                 double y = point.y;
@@ -263,11 +268,19 @@ public class ImageProcessor implements Runnable {
                 }
             }
 
+            // combine contours using convex hull
             MatOfInt hullIdx = new MatOfInt();
             MatOfPoint all = new MatOfPoint();
             all.fromList(combined);
             Imgproc.convexHull(all, hullIdx);
             MatOfPoint normalizedCombinedContour = normalizeHull(all, hullIdx);
+
+            // check if the result is reasonably vertical
+            Rect boundingRect = Imgproc.boundingRect(normalizedCombinedContour);
+            if (((double) boundingRect.height) / boundingRect.width < 1.5) {
+                continue;
+            }
+
             hullIdx.release();
             all.release();
             double area = Imgproc.contourArea(normalizedCombinedContour);
@@ -275,6 +288,7 @@ public class ImageProcessor implements Runnable {
             combinedContours.add(new ContourInfo(normalizedCombinedContour, area, numSources));
         }
 
+        // get the 2 largest contours in the image that passed the first operation
         Collections.sort(combinedContours, new Comparator<ContourInfo>() {
             @Override
             public int compare(ContourInfo o1, ContourInfo o2) {
@@ -288,7 +302,8 @@ public class ImageProcessor implements Runnable {
             return false;
         }
 
-        // find the 2 contours that make up a single gear target
+        // if there are 3 or more contours, detect the 2 closest to each other. These are likely
+        // the gear target we want
 
         if (combinedContours.size() >= 3) {
             ContourInfo c0 = combinedContours.get(0);
@@ -338,6 +353,7 @@ public class ImageProcessor implements Runnable {
             }
         }
 
+        // make sure 0 is on the left
         double cx0 = centerOfContour(combinedContours.get(0).contour).x;
         double cx1 = centerOfContour(combinedContours.get(1).contour).x;
         if (cx0 > cx1) {
@@ -348,6 +364,7 @@ public class ImageProcessor implements Runnable {
         MatOfPoint c0 = combinedContours.get(0).contour;
         MatOfPoint c1 = combinedContours.get(1).contour;
 
+        // fit a 4-sided shape to each contour
         MatOfPoint2f d0 = new MatOfPoint2f();
         MatOfPoint2f d1 = new MatOfPoint2f();
         c0.convertTo(d0, CvType.CV_32FC2);
@@ -368,11 +385,15 @@ public class ImageProcessor implements Runnable {
             return false;
         }
 
+        // reorder clockwise from bottom left corner for left target, counterclockwise from bottom
+        // right for right target. So we know which points we're talking about when we index into
+        // the array
         reorderQuad(e0, true);
         reorderQuad(e1, false);
         MatOfPoint2f[] quads = new MatOfPoint2f[]{e0, e1};
 
-        // fix cut off outer corner
+        // we need the bottom outer corner of each target to construct the target quadrilateral. If
+        // it's being blocked, use the slope of the unblocked target bottom edge to approximate it
         int potentialCornerCutContourIdx = -1;
         if(combinedContours.get(0).numSourceContours >= 2) {
             potentialCornerCutContourIdx = 0;
@@ -395,27 +416,26 @@ public class ImageProcessor implements Runnable {
 
                 double intersectionX = (bU30 - bC10) / (mC10 - mU30);
                 double intersectionY = mC10 * intersectionX + bC10;
+
+                // screwed up calculations? Ignore it
+                if (Double.isNaN(intersectionX) || Double.isNaN(intersectionY)
+                        || Double.isInfinite(intersectionX) || Double.isInfinite(intersectionY)) {
+                    return false;
+                }
+
                 qCut[0].x = intersectionX;
                 qCut[0].y = intersectionY;
                 quads[potentialCornerCutContourIdx].fromArray(qCut);
             }
         }
 
-//            drawMatOfPoint2f(dst, e0, new Scalar(255, 0, 0));
-//            Imgproc.putText(dst, "0", centerOfContour(e0), Core.FONT_HERSHEY_PLAIN, 1,
-//                    new Scalar(0, 0, 255));
-//
-//            drawMatOfPoint2f(dst, e1, new Scalar(255, 0, 0));
-//            Imgproc.putText(dst, "1", centerOfContour(e1), Core.FONT_HERSHEY_PLAIN, 1,
-//                    new Scalar(0, 0, 255));
-
+        // yay we've found a target 🎉
         Point[] p0 = e0.toArray();
         Point[] p1 = e1.toArray();
         Point[] bigQuad = new Point[] {p0[0], p0[1], p1[1], p1[0]};
         polyFit.fromArray(bigQuad);
 
-//        drawMatOfPoint2f(dst, mainRect, new Scalar(255, 255, 255));
-
+        // clean up those pesky native resources
         releaseList0(combinedContours);
         c0.release();
         c1.release();
