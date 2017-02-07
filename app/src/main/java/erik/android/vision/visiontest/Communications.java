@@ -121,6 +121,7 @@ public class Communications {
         packet.putDouble(tvec_0);
         packet.putDouble(tvec_1);
         packet.putDouble(tvec_2);
+        packet.position(0);
         try {
             udpCameraServerChannel.send(packet, roboRioDataAddress);
         } catch (IOException e) {

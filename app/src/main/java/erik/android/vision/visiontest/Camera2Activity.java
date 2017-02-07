@@ -34,6 +34,7 @@ import android.widget.Toast;
 
 import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Mat;
+import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
 import java.util.ArrayList;
@@ -86,6 +87,8 @@ public class Camera2Activity extends AppCompatActivity {
     private int mNv21Width, mNv21Height, mRgbWidth, mRgbHeight;
     private Mat imageBgrMat = new Mat();
     private Mat imageRgbMat = new Mat();
+
+    private boolean shouldCapture = false;
 
     // helper classes
     private Calibration mCalibration;
@@ -182,6 +185,11 @@ public class Camera2Activity extends AppCompatActivity {
             Imgproc.cvtColor(nv21Mat, imageBgrMat, Imgproc.COLOR_YUV2BGR_NV12, 3);
             Imgproc.cvtColor(imageBgrMat, imageRgbMat, Imgproc.COLOR_BGR2RGB);
 
+            if(shouldCapture) {
+                Imgcodecs.imwrite("/storage/emulated/0/" + System.currentTimeMillis() + ".png", imageRgbMat);
+                shouldCapture = false;
+            }
+
             // draw over the image using processing data
             mImageProcessor.postUpdateAndDraw(imageBgrMat, imageRgbMat);
 
@@ -269,6 +277,17 @@ public class Camera2Activity extends AppCompatActivity {
                     @Override
                     public void run() {
                         throw new RuntimeException("Triggered crash");
+                    }
+                });
+            }
+        });
+        new NTCommand("Vision/TakeFrame", "TakeFrame", new Runnable() {
+            @Override
+            public void run() {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        shouldCapture = true;
                     }
                 });
             }
