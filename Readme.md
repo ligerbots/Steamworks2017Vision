@@ -1,5 +1,5 @@
-# VisionTest #
-Playing with OpenCV Android vison for FRC
+# Steamworks2017Vision #
+OpenCV Android vision for FRC Steamworks.
 
 ## Nexus 5 setup ##
 
