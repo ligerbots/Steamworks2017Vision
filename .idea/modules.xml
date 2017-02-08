@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/VisionTest.iml" filepath="$PROJECT_DIR$/VisionTest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/Steamworks2017Vision.iml" filepath="$PROJECT_DIR$/Steamworks2017Vision.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
       <module fileurl="file://$PROJECT_DIR$/app-native/app-native.iml" filepath="$PROJECT_DIR$/app-native/app-native.iml" />
       <module fileurl="file://$PROJECT_DIR$/ntcore/ntcore.iml" filepath="$PROJECT_DIR$/ntcore/ntcore.iml" />
