@@ -161,8 +161,8 @@ public class Communications {
         }
         csPacket.limit(dataLength + 9);
         csPacket.position(0);
-        csPacket.put(CS_MAGIC_NUMBER);
         csPacket.put(Parameters.purpose.dataCode);
+        csPacket.put(CS_MAGIC_NUMBER);
         csPacket.putInt(dataLength);
         csPacket.position(0);
         // yay more native performance hacks
