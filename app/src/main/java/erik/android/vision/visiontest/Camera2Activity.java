@@ -270,7 +270,7 @@ public class Camera2Activity extends AppCompatActivity {
         Communications.initCameraServer();
         Communications.initBatteryMonitor(this);
 
-        new NTCommand("Vision/Crash", "Crash", new Runnable() {
+        new NTCommand(Parameters.purpose.visionTable + "/Crash", "Crash", new Runnable() {
             @Override
             public void run() {
                 runOnUiThread(new Runnable() {
@@ -281,7 +281,7 @@ public class Camera2Activity extends AppCompatActivity {
                 });
             }
         });
-        new NTCommand("Vision/TakeFrame", "TakeFrame", new Runnable() {
+        new NTCommand(Parameters.purpose.visionTable + "/TakeFrame", "TakeFrame", new Runnable() {
             @Override
             public void run() {
                 runOnUiThread(new Runnable() {

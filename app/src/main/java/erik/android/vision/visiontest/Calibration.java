@@ -30,7 +30,6 @@ import edu.wpi.first.wpilibj.tables.ITable;
 
 public class Calibration {
     private static final String TAG = "Calibration";
-    public static final String TABLE_NAME = "Vision/Calibration";
     private static final String SAVE_LOCATION = "/storage/emulated/0/cameraparameters.json";
 
     private final Size mPatternSize = new Size(4, 11);
@@ -60,7 +59,7 @@ public class Calibration {
         Mat.zeros(5, 1, CvType.CV_64FC1).copyTo(mDistortionCoefficients);
         Log.i(TAG, "Instantiated new " + this.getClass());
 
-        mTable = NetworkTable.getTable(TABLE_NAME);
+        mTable = NetworkTable.getTable(Parameters.purpose.visionTable + "/Calibration");
 
         mTable.putBoolean("enableCalibration", false);
         mTable.putBoolean("calibrationPatternFound", false);
@@ -83,7 +82,7 @@ public class Calibration {
             }
         }
 
-        new NTCommand(TABLE_NAME + "/TakeFrame", "CalibrationTakeFrame", new Runnable() {
+        new NTCommand(Parameters.purpose.visionTable + "/Calibration/TakeFrame", "CalibrationTakeFrame", new Runnable() {
             @Override
             public void run() {
                 if(mTable.getBoolean("enableCalibration", false)) {
@@ -92,7 +91,7 @@ public class Calibration {
             }
         });
 
-        new NTCommand(TABLE_NAME + "/Calibrate", "CalibrationCalibrate", new Runnable() {
+        new NTCommand(Parameters.purpose.visionTable + "/Calibration/Calibrate", "CalibrationCalibrate", new Runnable() {
             @Override
             public void run() {
                 if(mTable.getBoolean("enableCalibration", false)) {

@@ -51,14 +51,16 @@ public class Communications {
     protected static NetworkTable root;
 
     public static void initNetworkTables() {
+        Parameters.initPurpose();
+
         NetworkTable.setClientMode();
-        NetworkTable.setNetworkIdentity(IDENTITY);
+        NetworkTable.setNetworkIdentity(IDENTITY + "_" + Parameters.purpose.toString());
         NetworkTable.setIPAddress(ROBORIO_ADDRESS);
         NetworkTable.setPersistentFilename(PERSISTENT_FILENAME);
         NetworkTable.initialize();
         Parameters.initDefaultVariables();
 
-        root = NetworkTable.getTable("Vision");
+        root = NetworkTable.getTable(Parameters.purpose.visionTable);
     }
 
     public static void closeNetworkTables() {
@@ -113,8 +115,9 @@ public class Communications {
             return;
         }
 
-        ByteBuffer packet = ByteBuffer.allocateDirect(Double.SIZE / 8 * 6);
+        ByteBuffer packet = ByteBuffer.allocateDirect(Double.SIZE / 8 * 6 + 1);
         packet.position(0);
+        packet.put(Parameters.purpose.dataCode);
         packet.putDouble(rvec_0);
         packet.putDouble(rvec_1);
         packet.putDouble(rvec_2);

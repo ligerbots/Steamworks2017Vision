@@ -2,6 +2,7 @@ package erik.android.vision.visiontest;
 
 
 import android.graphics.ImageFormat;
+import android.util.Log;
 import android.util.Range;
 import android.util.Size;
 
@@ -19,11 +20,29 @@ import edu.wpi.first.wpilibj.tables.ITableListener;
  * Stores constants and runtime parameters
  */
 public class Parameters {
+    private static final String TAG = "Parameters";
+
     private static final String SAVE_FILE = "/storage/emulated/0/camerasettings.json";
+    private static final String PURPOSE_FILE = "/storage/emulated/0/purpose.txt";
+
+    public enum Purpose {
+        GEAR_LIFT("Vision_Gear", (byte) 0x93),
+        BOILER("Vision_Boiler", (byte) 0xB0);
+
+        String visionTable;
+        byte dataCode;
+        Purpose(String visionTable, byte dataCode) {
+            this.visionTable = visionTable;
+            this.dataCode = dataCode;
+        }
+    }
+
+    public static Purpose purpose;
 
     public static final double DEFAULT_CALIB_DOT_SPACING = 4.15625; // in
-    public static final double DEFAULT_TARGET_WIDTH = 10.25; // in
-    public static final double DEFAULT_TARGET_HEIGHT = 5.0; // in
+    public static final double GEAR_TARGET_WIDTH = 10.25; // in
+    public static final double GEAR_TARGET_HEIGHT = 5.0; // in
+    public static final double BOILER_STRIP_SPACING = 7;
 
     public static final int MAX_PREVIEW_WIDTH = 1920;
     public static final int MAX_PREVIEW_HEIGHT = 1080;
@@ -61,22 +80,54 @@ public class Parameters {
         }
     };
 
+    public static void initPurpose() {
+        StringBuilder builder = new StringBuilder();
+        try {
+            FileReader reader = new FileReader(PURPOSE_FILE);
+            char[] c = new char[1024];
+            int b;
+            while ((b = reader.read(c)) > -1) {
+                builder.append(c, 0, b);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error", e);
+        }
+
+        String thisInstancePurpose = builder.toString();
+
+        if (thisInstancePurpose.contains("boiler")) {
+            purpose = Purpose.BOILER;
+        } else {
+            purpose = Purpose.GEAR_LIFT;
+        }
+    }
+
     public static void initDefaultVariables() {
-        ITable calibTable = NetworkTable.getTable(Calibration.TABLE_NAME);
+        ITable calibTable = NetworkTable.getTable(purpose.visionTable + "/Calibration");
         if(!calibTable.containsKey("squareSize"))
             calibTable.putNumber("squareSize", DEFAULT_CALIB_DOT_SPACING);
 
-        targetSizeTable = NetworkTable.getTable("Vision/target");
-        if(!targetSizeTable.containsKey("width"))
-            targetSizeTable.putNumber("width", DEFAULT_TARGET_WIDTH);
-        if(!targetSizeTable.containsKey("height"))
-            targetSizeTable.putNumber("height", DEFAULT_TARGET_HEIGHT);
+        targetSizeTable = NetworkTable.getTable(purpose.visionTable + "/target");
+        if(!targetSizeTable.containsKey("width")) {
+            if (purpose == Purpose.BOILER) {
+                targetSizeTable.putNumber("width", 0);
+            } else {
+                targetSizeTable.putNumber("width", GEAR_TARGET_WIDTH);
+            }
+        }
+        if(!targetSizeTable.containsKey("height")) {
+            if (purpose == Purpose.BOILER) {
+                targetSizeTable.putNumber("height", BOILER_STRIP_SPACING);
+            } else {
+                targetSizeTable.putNumber("height", GEAR_TARGET_HEIGHT);
+            }
+        }
     }
 
     public static double[] getTargetSize() {
         return new double[]{
-                targetSizeTable.getNumber("width", DEFAULT_TARGET_WIDTH),
-                targetSizeTable.getNumber("height", DEFAULT_TARGET_HEIGHT)
+                targetSizeTable.getNumber("width", GEAR_TARGET_WIDTH),
+                targetSizeTable.getNumber("height", GEAR_TARGET_HEIGHT)
         };
     }
 
@@ -87,9 +138,9 @@ public class Parameters {
 
         if(sensitivity != null) return;
 
-        sensitivity = new NTBoundedNumber("Vision/sensitivity", camSensitivityRange.getLower(),
+        sensitivity = new NTBoundedNumber(purpose.visionTable + "/sensitivity", camSensitivityRange.getLower(),
                 camSensitivityRange.getUpper());
-        exposureTime = new NTBoundedNumber("Vision/exposureTime", camExposureTimeRange.getLower(),
+        exposureTime = new NTBoundedNumber(purpose.visionTable + "/exposureTime", camExposureTimeRange.getLower(),
                 camExposureTimeRange.getUpper());
 
         if(new File(SAVE_FILE).exists()) {

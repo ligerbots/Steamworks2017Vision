@@ -50,10 +50,10 @@ public class ImageProcessor implements Runnable {
     private NetworkTable result;
 
     public ImageProcessor(Calibration calibration) {
-        mFilterColorRange = new NTColorPicker("Vision/colorRange", NTColorPicker.ColorMode.HSV);
+        mFilterColorRange = new NTColorPicker(Parameters.purpose.visionTable + "/colorRange", NTColorPicker.ColorMode.HSV);
         mProcessingFps = new FpsCounter("ProcessingThread");
         mCalibration = calibration;
-        result = NetworkTable.getTable("Vision/result");
+        result = NetworkTable.getTable(Parameters.purpose.visionTable + "/result");
 
         mProcessingThread = new Thread(this);
         mProcessingThread.setName("OpenCV Image Processor");
@@ -118,18 +118,31 @@ public class ImageProcessor implements Runnable {
                 mFilterColorRange.setHistogram(mProcessingHsvMat);
 
                 // Process gear lift
-                boolean found = findGearTarget(mProcessingHsvMat);
+                boolean found;
+                if (Parameters.purpose == Parameters.Purpose.BOILER) {
+                    found = findBoilerTarget(mProcessingHsvMat);
+                } else {
+                    found = findGearTarget(mProcessingHsvMat);
+                }
 
                 if(found) {
                     // calculate camera transform
                     MatOfPoint3f objPoints = new MatOfPoint3f();
                     double[] targetSize = Parameters.getTargetSize();
-                    objPoints.fromArray(
-                            new Point3(-targetSize[0] / 2, -targetSize[1] / 2, 0),
-                            new Point3(-targetSize[0] / 2, targetSize[1] / 2, 0),
-                            new Point3(targetSize[0] / 2, targetSize[1] / 2, 0),
-                            new Point3(targetSize[0] / 2, -targetSize[1] / 2, 0)
-                    );
+
+                    if (Parameters.purpose == Parameters.Purpose.BOILER) {
+                        objPoints.fromArray(
+                                new Point3(0, 6*12+7, -7.5),
+                                new Point3(0, 6*12+7 + targetSize[1], -7.5)
+                        );
+                    } else {
+                        objPoints.fromArray(
+                                new Point3(-targetSize[0] / 2, -targetSize[1] / 2, 0),
+                                new Point3(-targetSize[0] / 2, targetSize[1] / 2, 0),
+                                new Point3(targetSize[0] / 2, targetSize[1] / 2, 0),
+                                new Point3(targetSize[0] / 2, -targetSize[1] / 2, 0)
+                        );
+                    }
 
                     double[] cameraMatrixA = mCalibration.getCameraMatrixArray();
                     double[] distortionCoefficientsA =
@@ -299,6 +312,7 @@ public class ImageProcessor implements Runnable {
         if (combinedContours.size() < 2) {
             Log.i(TAG, "No gear target found: not enough contours");
             releaseList0(combinedContours);
+            contourCopy.release();
             return false;
         }
 
@@ -349,6 +363,7 @@ public class ImageProcessor implements Runnable {
             } else {
                 Log.i(TAG, "No gear target found: contours too small");
                 releaseList0(combinedContours);
+                contourCopy.release();
                 return false;
             }
         }
@@ -376,6 +391,7 @@ public class ImageProcessor implements Runnable {
         if(e0 == null || e1 == null) {
             Log.i(TAG, "No gear target found: couldn't quad fit");
             releaseList0(combinedContours);
+            contourCopy.release();
             c0.release();
             c1.release();
             d0.release();
@@ -420,6 +436,14 @@ public class ImageProcessor implements Runnable {
                 // screwed up calculations? Ignore it
                 if (Double.isNaN(intersectionX) || Double.isNaN(intersectionY)
                         || Double.isInfinite(intersectionX) || Double.isInfinite(intersectionY)) {
+                    releaseList0(combinedContours);
+                    contourCopy.release();
+                    c0.release();
+                    c1.release();
+                    d0.release();
+                    d1.release();
+                    e0.release();
+                    e1.release();
                     return false;
                 }
 
@@ -437,6 +461,7 @@ public class ImageProcessor implements Runnable {
 
         // clean up those pesky native resources
         releaseList0(combinedContours);
+        contourCopy.release();
         c0.release();
         c1.release();
         d0.release();
@@ -444,6 +469,54 @@ public class ImageProcessor implements Runnable {
         e0.release();
         e1.release();
 
+        return true;
+    }
+
+    private boolean findBoilerTarget(Mat src) {
+        // filter out green
+        Core.inRange(src, mFilterColorRange.getLower(),
+                mFilterColorRange.getUpper(), src);
+
+        releaseList(contours);
+
+        // detect all contours
+        Mat contourCopy = src.clone();
+        Imgproc.findContours(contourCopy, contours, hierarchy, Imgproc.RETR_CCOMP,
+                Imgproc.CHAIN_APPROX_SIMPLE);
+
+        if (contours.size() < 2) {
+            contourCopy.release();
+            return false;
+        }
+
+        List<ContourInfo> contourInfos = new LinkedList<>();
+        for (MatOfPoint contour: contours) {
+            contourInfos.add(new ContourInfo(contour, Imgproc.contourArea(contour), 1));
+        }
+
+        Collections.sort(contourInfos, new Comparator<ContourInfo>() {
+            @Override
+            public int compare(ContourInfo o1, ContourInfo o2) {
+                return (int) Math.signum(o2.area - o1.area);
+            }
+        });
+
+        MatOfPoint c0 = contourInfos.get(0).contour;
+        MatOfPoint c1 = contourInfos.get(1).contour;
+
+        Moments m0 = Imgproc.moments(c0);
+        Moments m1 = Imgproc.moments(c1);
+
+        Point p0 = new Point(m0.m10 / m0.m00, m0.m01 / m0.m00);
+        Point p1 = new Point(m1.m10 / m1.m00, m1.m01 / m1.m00);
+
+        if (p0.y > p1.y) {
+            Point tmp = p1;
+            p1 = p0;
+            p0 = tmp;
+        }
+
+        polyFit.fromArray(p0, p1);
         return true;
     }
 
