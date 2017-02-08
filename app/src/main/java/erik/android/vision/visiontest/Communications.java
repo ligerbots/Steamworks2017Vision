@@ -159,9 +159,10 @@ public class Communications {
             Log.e(TAG, "Not enough CameraServer buffer space");
             return;
         }
-        csPacket.limit(dataLength + 8);
+        csPacket.limit(dataLength + 9);
         csPacket.position(0);
         csPacket.put(CS_MAGIC_NUMBER);
+        csPacket.put(Parameters.purpose.dataCode);
         csPacket.putInt(dataLength);
         csPacket.position(0);
         // yay more native performance hacks
