@@ -63,6 +63,12 @@ public class Communications {
         root = NetworkTable.getTable(Parameters.purpose.visionTable);
     }
 
+    public static void reconnect(String newAddr) {
+        NetworkTable.shutdown();
+        NetworkTable.setIPAddress(newAddr);
+        NetworkTable.initialize();
+    }
+
     public static void closeNetworkTables() {
         NetworkTable.shutdown();
     }
@@ -216,7 +222,7 @@ public class Communications {
         return isCharging;
     }
 
-    public static void initBatteryMonitor(final Context ctx) {
+    public static void initBatteryMonitor(final Camera2Activity ctx) {
         Thread batteryMonitorThread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -227,7 +233,7 @@ public class Communications {
                     if(isCharging(ctx)) {
                         lastChargeTime = System.currentTimeMillis();
                     } else {
-                        if(System.currentTimeMillis() - lastChargeTime > 1000 * 60 * 2) {
+                        if(System.currentTimeMillis() - lastChargeTime > 1000 * 60 * 2 && !ctx.isOverrideChecked()) {
                             try {
                                 Log.i(TAG, "Shutting down");
                                 Runtime.getRuntime().exec("su -c reboot -p");

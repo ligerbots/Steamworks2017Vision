@@ -42,7 +42,8 @@ public class Parameters {
     public static final double DEFAULT_CALIB_DOT_SPACING = 4.15625; // in
     public static final double GEAR_TARGET_WIDTH = 10.25; // in
     public static final double GEAR_TARGET_HEIGHT = 5.0; // in
-    public static final double BOILER_STRIP_SPACING = 7;
+    public static final double BOILER_TARGET_WIDTH = 0.82 * 15; // in
+    public static final double BOILER_TARGET_HEIGHT = 6.0; // in
 
     public static final int MAX_PREVIEW_WIDTH = 1920;
     public static final int MAX_PREVIEW_HEIGHT = 1080;
@@ -110,16 +111,16 @@ public class Parameters {
         targetSizeTable = NetworkTable.getTable(purpose.visionTable + "/target");
         if(!targetSizeTable.containsKey("width")) {
             if (purpose == Purpose.BOILER) {
-                targetSizeTable.putNumber("width", 0);
+                targetSizeTable.putNumber("width", BOILER_TARGET_WIDTH);
             } else {
                 targetSizeTable.putNumber("width", GEAR_TARGET_WIDTH);
             }
         }
         if(!targetSizeTable.containsKey("height")) {
             if (purpose == Purpose.BOILER) {
-                targetSizeTable.putNumber("height", BOILER_STRIP_SPACING);
+                targetSizeTable.putNumber("height", BOILER_TARGET_HEIGHT);
             } else {
-                targetSizeTable.putNumber("height", GEAR_TARGET_HEIGHT);
+                targetSizeTable.putNumber("height", GEAR_TARGET_WIDTH);
             }
         }
     }

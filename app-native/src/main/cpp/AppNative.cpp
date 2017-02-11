@@ -19,7 +19,7 @@ Java_erik_android_vision_visiontest_1native_AppNative_copyMatOfByteToCameraServe
                                                                           jobject buffer, jlong matAddr) {
     cv::Mat* source = (cv::Mat*) matAddr;
     uchar* dest = (uchar*) env->GetDirectBufferAddress(buffer);
-    uchar* writePosition = &dest[8];
+    uchar* writePosition = &dest[9];
     memcpy(writePosition, source->data, (size_t) (source->rows * source->cols));
 }
 

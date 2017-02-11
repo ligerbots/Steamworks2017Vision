@@ -31,7 +31,7 @@ public class FpsCounter {
             Log.i(TAG, mName + ": " + mFps);
             mLastTime = System.currentTimeMillis();
             mFrameCount = 0;
-            NetworkTable.getTable("Vision").putNumber("fps_" + mName, mFps);
+            Communications.root.putNumber("fps_" + mName, mFps);
         }
     }
 

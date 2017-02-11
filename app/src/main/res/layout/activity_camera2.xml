@@ -16,4 +16,21 @@
         android:layout_alignParentTop="true"
         android:layout_alignParentStart="true"
         android:id="@+id/textureView" />
+
+    <EditText
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:ems="10"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentStart="true"
+        android:id="@+id/overrideAddr"
+        android:inputType="textWebEditText" />
+
+    <CheckBox
+        android:text="Override NT Address"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_toEndOf="@+id/overrideAddr"
+        android:id="@+id/overrideEnabled" />
 </RelativeLayout>

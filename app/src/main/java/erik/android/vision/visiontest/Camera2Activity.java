@@ -29,7 +29,11 @@ import android.util.Size;
 import android.util.SparseIntArray;
 import android.view.Surface;
 import android.view.TextureView;
+import android.view.View;
 import android.view.WindowManager;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import org.opencv.android.OpenCVLoader;
@@ -103,6 +107,9 @@ public class Camera2Activity extends AppCompatActivity {
     private boolean mNeedsToRestartRepeatingCapture = false;
 
     private CrashRestarter crashRestarter;
+
+    private EditText overrideAddr;
+    private CheckBox overrideEnabled;
 
     /**
      * Listener for when the display is ready. Opens the camera and configures displaying.
@@ -310,6 +317,20 @@ public class Camera2Activity extends AppCompatActivity {
             }
         }, true);
 
+        overrideAddr = (EditText) findViewById(R.id.overrideAddr);
+        overrideEnabled = (CheckBox) findViewById(R.id.overrideEnabled);
+        overrideEnabled.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (isChecked) {
+                    String addr = overrideAddr.getText().toString();
+                    Communications.reconnect(addr);
+                } else {
+                    Communications.reconnect(Communications.ROBORIO_ADDRESS);
+                }
+            }
+        });
+
         Log.i(TAG, "Phone info " + Build.MANUFACTURER + " " + Build.MODEL);
 
         if(!Build.MANUFACTURER.equals("LGE") || !Build.MODEL.equals("Nexus 5")) {
@@ -323,6 +344,10 @@ public class Camera2Activity extends AppCompatActivity {
                     "Update the code and then remove this notice.");
             finish();
         }
+    }
+
+    public boolean isOverrideChecked() {
+        return overrideEnabled.isChecked();
     }
 
     @Override

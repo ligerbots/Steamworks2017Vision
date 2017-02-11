@@ -14,6 +14,7 @@ import org.opencv.core.MatOfPoint3f;
 import org.opencv.core.Point;
 import org.opencv.core.Point3;
 import org.opencv.core.Rect;
+import org.opencv.core.RotatedRect;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.imgproc.Moments;
@@ -62,31 +63,31 @@ public class ImageProcessor implements Runnable {
     }
 
     public void postUpdateAndDraw(Mat sourceBgrMat, Mat drawingRgbMat) {
-        synchronized(mProcessingLock) {
-            if(mProcessingThread.getState() == Thread.State.WAITING) {
-                if(mProcessingHsvMat == null) {
+        synchronized (mProcessingLock) {
+            if (mProcessingThread.getState() == Thread.State.WAITING) {
+                if (mProcessingHsvMat == null) {
                     mProcessingHsvMat = new Mat();
                 }
                 Imgproc.cvtColor(sourceBgrMat, mProcessingHsvMat, Imgproc.COLOR_RGB2HSV);
-                if(mCalibGrayMat == null) {
+                if (mCalibGrayMat == null) {
                     mCalibGrayMat = new Mat();
                 }
-                if(mCalibration.isEnabled()) {
+                if (mCalibration.isEnabled()) {
                     Imgproc.cvtColor(sourceBgrMat, mCalibGrayMat, Imgproc.COLOR_BGR2GRAY);
                     //mCalibration.renderFrame(drawingRgbMat);
                 }
                 mProcessingLock.notify();
             }
 
-            if(mProcessingLargestContour != null) {
+            if (mProcessingLargestContour != null) {
                 Imgproc.drawContours(drawingRgbMat,
                         Collections.singletonList(mProcessingLargestContour), 0,
                         new Scalar(255, 0, 0));
             }
-            if(mProcessingPolyFit != null) {
+            if (mProcessingPolyFit != null) {
                 org.opencv.core.Point[] localCopy = mProcessingPolyFit;
-                for(int i=0; i<localCopy.length; ++i) {
-                    Imgproc.line(drawingRgbMat, localCopy[i], localCopy[(i+1)%localCopy.length],
+                for (int i = 0; i < localCopy.length; ++i) {
+                    Imgproc.line(drawingRgbMat, localCopy[i], localCopy[(i + 1) % localCopy.length],
                             new Scalar(0, 255, 0));
                     Imgproc.putText(drawingRgbMat, Integer.toString(i), localCopy[i],
                             Core.FONT_HERSHEY_PLAIN, 2, new Scalar(0, 0, 255));
@@ -97,9 +98,9 @@ public class ImageProcessor implements Runnable {
 
     @Override
     public void run() {
-        try {
-            //noinspection InfiniteLoopStatement
-            while (true) {
+        //noinspection InfiniteLoopStatement
+        while (true) {
+            try {
                 Log.i(TAG, "Processing thread waiting");
                 synchronized (mProcessingLock) {
                     try {
@@ -111,7 +112,7 @@ public class ImageProcessor implements Runnable {
                 Log.i(TAG, "Processing thread loop");
                 long st = System.currentTimeMillis();
                 // if calibration is enabled, do it
-                if(mCalibration.isEnabled()) {
+                if (mCalibration.isEnabled()) {
                     mCalibration.findPattern(mCalibGrayMat);
                 }
                 // send image histogram
@@ -125,24 +126,24 @@ public class ImageProcessor implements Runnable {
                     found = findGearTarget(mProcessingHsvMat);
                 }
 
-                if(found) {
+                if (found) {
+                    Point[] polyFitPts = polyFit.toArray();
+                    Communications.root.putString("Image_Coords",String.format("%s%n%s%n%s%n%s",
+                            polyFitPts[0].toString(),
+                            polyFitPts[1].toString(),
+                            polyFitPts[2].toString(),
+                            polyFitPts[3].toString()));
+
                     // calculate camera transform
                     MatOfPoint3f objPoints = new MatOfPoint3f();
                     double[] targetSize = Parameters.getTargetSize();
 
-                    if (Parameters.purpose == Parameters.Purpose.BOILER) {
-                        objPoints.fromArray(
-                                new Point3(0, 6*12+7, -7.5),
-                                new Point3(0, 6*12+7 + targetSize[1], -7.5)
-                        );
-                    } else {
-                        objPoints.fromArray(
-                                new Point3(-targetSize[0] / 2, -targetSize[1] / 2, 0),
-                                new Point3(-targetSize[0] / 2, targetSize[1] / 2, 0),
-                                new Point3(targetSize[0] / 2, targetSize[1] / 2, 0),
-                                new Point3(targetSize[0] / 2, -targetSize[1] / 2, 0)
-                        );
-                    }
+                    objPoints.fromArray(
+                            new Point3(-targetSize[0] / 2, -targetSize[1] / 2, 0),
+                            new Point3(-targetSize[0] / 2, targetSize[1] / 2, 0),
+                            new Point3(targetSize[0] / 2, targetSize[1] / 2, 0),
+                            new Point3(targetSize[0] / 2, -targetSize[1] / 2, 0)
+                    );
 
                     double[] cameraMatrixA = mCalibration.getCameraMatrixArray();
                     double[] distortionCoefficientsA =
@@ -200,7 +201,7 @@ public class ImageProcessor implements Runnable {
 
                 Log.i(TAG, "Processing thread dt: " + (System.currentTimeMillis() - st));
 
-                if(found) {
+                if (found) {
                     mProcessingPolyFit = polyFit.toArray();
                 } else {
                     mProcessingPolyFit = null;
@@ -208,10 +209,11 @@ public class ImageProcessor implements Runnable {
 
                 mProcessingFps.feed();
                 Log.i(TAG, "Processing thread loop done");
+            } catch (Throwable t) {
+                Log.e(TAG, "Processing thread error!", t);
             }
-        } catch(Throwable t) {
-            Log.e(TAG, "Processing thread error!", t);
         }
+
     }
 
     static class ContourInfo {
@@ -227,14 +229,14 @@ public class ImageProcessor implements Runnable {
     }
 
     private void releaseList(List<? extends Mat> list) {
-        for(Mat mat: list) {
+        for (Mat mat : list) {
             mat.release();
         }
         list.clear();
     }
 
     private void releaseList0(List<ContourInfo> list) {
-        for(ContourInfo info: list) {
+        for (ContourInfo info : list) {
             info.contour.release();
         }
         list.clear();
@@ -255,15 +257,15 @@ public class ImageProcessor implements Runnable {
         // combine contours that are close to each other. This links together the contours that may
         // be split up by the gear lift peg
         outer:
-        while(contours.size() > 0) {
+        while (contours.size() > 0) {
             MatOfPoint first = contours.remove(0);
             List<Point> combined = new ArrayList<>();
             combined.addAll(first.toList());
             int numSources = 1;
 
-            for(int i = 0; i < contours.size(); i++) {
+            for (int i = 0; i < contours.size(); i++) {
                 MatOfPoint other = contours.get(i);
-                if(contourMinDist(first, other) < 30 * 30) {
+                if (contourMinDist(first, other) < 30 * 30) {
                     combined.addAll(other.toList());
                     contours.remove(i);
                     numSources++;
@@ -273,7 +275,7 @@ public class ImageProcessor implements Runnable {
 
             // check if the entire contour is reasonably within bounds, otherwise we risk garbage
             // values from a clipped target
-            for (Point point: combined) {
+            for (Point point : combined) {
                 double x = point.x;
                 double y = point.y;
                 if (x < 2 || x > src.width() - 2 || y < 2 || y > src.height() - 2) {
@@ -331,7 +333,7 @@ public class ImageProcessor implements Runnable {
             combinedContours.clear();
             final double SIZE_CUTOFF = 500;
 
-            if(a0 >= SIZE_CUTOFF && a1 >= SIZE_CUTOFF && a2 < SIZE_CUTOFF) {
+            if (a0 >= SIZE_CUTOFF && a1 >= SIZE_CUTOFF && a2 < SIZE_CUTOFF) {
                 System.out.println("a01");
                 combinedContours.add(c0);
                 combinedContours.add(c1);
@@ -347,11 +349,11 @@ public class ImageProcessor implements Runnable {
                 double dist01 = contourMinDist(c0.contour, c1.contour);
                 double dist12 = contourMinDist(c1.contour, c2.contour);
                 double dist02 = contourMinDist(c0.contour, c2.contour);
-                if(dist01 < dist12 && dist01 < dist02) {
+                if (dist01 < dist12 && dist01 < dist02) {
                     System.out.println("b01");
                     combinedContours.add(c0);
                     combinedContours.add(c1);
-                } else if(dist12 < dist01 && dist12 < dist02) {
+                } else if (dist12 < dist01 && dist12 < dist02) {
                     System.out.println("b12");
                     combinedContours.add(c1);
                     combinedContours.add(c2);
@@ -388,7 +390,7 @@ public class ImageProcessor implements Runnable {
         MatOfPoint2f e0 = quadFit(d0);
         MatOfPoint2f e1 = quadFit(d1);
 
-        if(e0 == null || e1 == null) {
+        if (e0 == null || e1 == null) {
             Log.i(TAG, "No gear target found: couldn't quad fit");
             releaseList0(combinedContours);
             contourCopy.release();
@@ -396,8 +398,8 @@ public class ImageProcessor implements Runnable {
             c1.release();
             d0.release();
             d1.release();
-            if(e0 != null) e0.release();
-            if(e1 != null) e1.release();
+            if (e0 != null) e0.release();
+            if (e1 != null) e1.release();
             return false;
         }
 
@@ -411,13 +413,13 @@ public class ImageProcessor implements Runnable {
         // we need the bottom outer corner of each target to construct the target quadrilateral. If
         // it's being blocked, use the slope of the unblocked target bottom edge to approximate it
         int potentialCornerCutContourIdx = -1;
-        if(combinedContours.get(0).numSourceContours >= 2) {
+        if (combinedContours.get(0).numSourceContours >= 2) {
             potentialCornerCutContourIdx = 0;
-        } else if(combinedContours.get(1).numSourceContours >= 2) {
+        } else if (combinedContours.get(1).numSourceContours >= 2) {
             potentialCornerCutContourIdx = 1;
         }
 
-        if(potentialCornerCutContourIdx > -1) {
+        if (potentialCornerCutContourIdx > -1) {
             Point[] qCut = quads[potentialCornerCutContourIdx].toArray();
             Point[] qUncut = quads[1 - potentialCornerCutContourIdx].toArray();
 
@@ -456,7 +458,7 @@ public class ImageProcessor implements Runnable {
         // yay we've found a target 🎉
         Point[] p0 = e0.toArray();
         Point[] p1 = e1.toArray();
-        Point[] bigQuad = new Point[] {p0[0], p0[1], p1[1], p1[0]};
+        Point[] bigQuad = new Point[]{p0[0], p0[1], p1[1], p1[0]};
         polyFit.fromArray(bigQuad);
 
         // clean up those pesky native resources
@@ -490,7 +492,7 @@ public class ImageProcessor implements Runnable {
         }
 
         List<ContourInfo> contourInfos = new LinkedList<>();
-        for (MatOfPoint contour: contours) {
+        for (MatOfPoint contour : contours) {
             contourInfos.add(new ContourInfo(contour, Imgproc.contourArea(contour), 1));
         }
 
@@ -501,22 +503,78 @@ public class ImageProcessor implements Runnable {
             }
         });
 
-        MatOfPoint c0 = contourInfos.get(0).contour;
-        MatOfPoint c1 = contourInfos.get(1).contour;
+        ContourInfo c0 = contourInfos.get(0);
+        ContourInfo c1 = contourInfos.get(1);
 
-        Moments m0 = Imgproc.moments(c0);
-        Moments m1 = Imgproc.moments(c1);
-
-        Point p0 = new Point(m0.m10 / m0.m00, m0.m01 / m0.m00);
-        Point p1 = new Point(m1.m10 / m1.m00, m1.m01 / m1.m00);
-
-        if (p0.y > p1.y) {
-            Point tmp = p1;
-            p1 = p0;
-            p0 = tmp;
+        if (centerOfContour(c0.contour).y > centerOfContour(c1.contour).y) {
+            ContourInfo tmp = c0;
+            c0 = c1;
+            c1 = tmp;
         }
 
-        polyFit.fromArray(p0, p1);
+        // make sure we have the right thing
+        double areaRatio = c1.area / c0.area;
+        if (areaRatio < 0.45 || areaRatio > 0.55) {
+            Log.i(TAG, "Didn't find correct pair of targets");
+            return false;
+        }
+
+        // check if the entire contour is reasonably within bounds, otherwise we risk garbage
+        // values from a clipped target
+        List<Point> allPts = new ArrayList<>();
+        allPts.addAll(c0.contour.toList());
+        allPts.addAll(c1.contour.toList());
+        for (Point point : allPts) {
+            double x = point.x;
+            double y = point.y;
+            if (x < 2 || x > src.width() - 2 || y < 2 || y > src.height() - 2) {
+                Log.i(TAG, "Target clipped");
+                return false;
+            }
+        }
+
+        MatOfInt hullIdx0 = new MatOfInt();
+        MatOfInt hullIdx1 = new MatOfInt();
+        Imgproc.convexHull(c0.contour, hullIdx0);
+        Imgproc.convexHull(c1.contour, hullIdx1);
+        c0.contour = normalizeHull(c0.contour, hullIdx0);
+        c1.contour = normalizeHull(c1.contour, hullIdx1);
+
+        MatOfPoint2f d0 = new MatOfPoint2f();
+        MatOfPoint2f d1 = new MatOfPoint2f();
+        c0.contour.convertTo(d0, CvType.CV_32FC2);
+        c1.contour.convertTo(d1, CvType.CV_32FC2);
+
+        RotatedRect r0 = Imgproc.minAreaRect(d0);
+        RotatedRect r1 = Imgproc.minAreaRect(d1);
+
+        Point[] box0 = new Point[4];
+        r0.points(box0);
+        Point[] box1 = new Point[4];
+        r1.points(box1);
+
+        Comparator<Point> comp = new Comparator<Point>() {
+            @Override
+            public int compare(Point p0, Point p1) {
+                return Double.compare(-p0.y, -p1.y);
+            }
+        };
+
+        Arrays.sort(box0, comp);
+        Arrays.sort(box1, comp);
+
+        if (box0[0].x > box0[1].x) {
+            Point tmp = box0[0];
+            box0[0] = box0[1];
+            box0[1] = tmp;
+        }
+        if (box1[0].x > box1[1].x) {
+            Point tmp = box1[0];
+            box1[0] = box1[1];
+            box1[1] = tmp;
+        }
+
+        polyFit.fromArray(box1[0], box0[0], box0[1], box1[1]);
         return true;
     }
 
@@ -532,10 +590,10 @@ public class ImageProcessor implements Runnable {
         Point[] p0 = c0.toArray();
         Point[] p1 = c1.toArray();
         double minSqDist = Double.MAX_VALUE;
-        for(int i = 0; i < p0.length; i++) {
-            for(int j = 0; j < p1.length; j++) {
+        for (int i = 0; i < p0.length; i++) {
+            for (int j = 0; j < p1.length; j++) {
                 double sqDist = squaredDist(p0[i], p1[j]);
-                if(sqDist < minSqDist) {
+                if (sqDist < minSqDist) {
                     minSqDist = sqDist;
                 }
             }
@@ -589,7 +647,7 @@ public class ImageProcessor implements Runnable {
             polyFitPoint[3] = right1;
         }
 
-        if(!clockwise) {
+        if (!clockwise) {
             Point tmp = polyFitPoint[0];
             polyFitPoint[0] = polyFitPoint[3];
             polyFitPoint[3] = tmp;
@@ -641,7 +699,7 @@ public class ImageProcessor implements Runnable {
 
         for (int i = 0; i < hull.size().height; i++) {
             int index = (int) hull.get(i, 0)[0];
-            double[] point = new double[] {src.get(index, 0)[0], src.get(index, 0)[1]};
+            double[] point = new double[]{src.get(index, 0)[0], src.get(index, 0)[1]};
             mopOut.put(i, 0, point);
         }
         return mopOut;
