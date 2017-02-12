@@ -1,5 +1,7 @@
 package erik.android.vision.visiontest;
 
+import android.content.Context;
+import android.os.Environment;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -30,7 +32,7 @@ import edu.wpi.first.wpilibj.tables.ITable;
 
 public class Calibration {
     private static final String TAG = "Calibration";
-    private static final String SAVE_LOCATION = "/storage/emulated/0/cameraparameters.json";
+    private static String SAVE_LOCATION;
 
     private final Size mPatternSize = new Size(4, 11);
     private final int mCornersSize = (int)(mPatternSize.width * mPatternSize.height);
@@ -47,7 +49,8 @@ public class Calibration {
 
     private ITable mTable;
 
-    public Calibration(int width, int height) {
+    public Calibration(Context ctx, int width, int height) {
+        SAVE_LOCATION = Environment.getExternalStorageDirectory().getPath() + "/cameraparameters.json";
         mImageSize = new Size(width, height);
         mFlags = Calib3d.CALIB_FIX_PRINCIPAL_POINT +
                  Calib3d.CALIB_ZERO_TANGENT_DIST +

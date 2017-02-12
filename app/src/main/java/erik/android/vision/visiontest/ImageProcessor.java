@@ -512,10 +512,18 @@ public class ImageProcessor implements Runnable {
             c1 = tmp;
         }
 
+        Communications.root.putString("Region_Areas", String.format("%f%n%f", c0.area, c1.area));
+
         // make sure we have the right thing
+
+        if (c0.area < 200 || c1.area < 200) {
+            Log.i(TAG, "Didn't find correct size of targets");
+            return false;
+        }
+
         double areaRatio = c1.area / c0.area;
-        if (areaRatio < 0.45 || areaRatio > 0.55) {
-            Log.i(TAG, "Didn't find correct pair of targets");
+        if (areaRatio < 0.40 || areaRatio > 0.60) {
+            Log.i(TAG, "Didn't find correct pair of targets: " + areaRatio);
             return false;
         }
 

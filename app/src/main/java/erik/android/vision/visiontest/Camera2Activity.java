@@ -19,6 +19,7 @@ import android.media.Image;
 import android.media.ImageReader;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.support.annotation.NonNull;
@@ -193,7 +194,7 @@ public class Camera2Activity extends AppCompatActivity {
             Imgproc.cvtColor(imageBgrMat, imageRgbMat, Imgproc.COLOR_BGR2RGB);
 
             if(shouldCapture) {
-                Imgcodecs.imwrite("/storage/emulated/0/" + System.currentTimeMillis() + ".png", imageRgbMat);
+                Imgcodecs.imwrite(Environment.getExternalStorageDirectory().getPath() + "/" + System.currentTimeMillis() + ".png", imageRgbMat);
                 shouldCapture = false;
             }
 
@@ -273,7 +274,7 @@ public class Camera2Activity extends AppCompatActivity {
 
         // init communications
         Communications.enableUsbTethering(this);
-        Communications.initNetworkTables();
+        Communications.initNetworkTables(this);
         Communications.initCameraServer();
         Communications.initBatteryMonitor(this);
 
@@ -333,7 +334,7 @@ public class Camera2Activity extends AppCompatActivity {
 
         Log.i(TAG, "Phone info " + Build.MANUFACTURER + " " + Build.MODEL);
 
-        if(!Build.MANUFACTURER.equals("LGE") || !Build.MODEL.equals("Nexus 5")) {
+        if(!Build.MODEL.equals("Nexus 5") && !Build.MODEL.equals("AOSP on HammerHead")) {
             // the issue is assuming that YUV_420_888 is equivalent to NV21. On the Nexus 5 it is;
             // however the NV21 format itself is not a supported capture format. Thus AppNative
             // has a hack to set a Mat data pointer to the Y channel ByteBuffer data pointer
@@ -428,7 +429,7 @@ public class Camera2Activity extends AppCompatActivity {
 
                 // initialize calibration and processing
                 if(mCalibration == null) {
-                    mCalibration = new Calibration(mRgbWidth, mRgbHeight);
+                    mCalibration = new Calibration(this, mRgbWidth, mRgbHeight);
                     mImageProcessor = new ImageProcessor(mCalibration);
                 }
 

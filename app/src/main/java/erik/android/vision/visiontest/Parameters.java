@@ -1,7 +1,9 @@
 package erik.android.vision.visiontest;
 
 
+import android.content.Context;
 import android.graphics.ImageFormat;
+import android.os.Environment;
 import android.util.Log;
 import android.util.Range;
 import android.util.Size;
@@ -22,8 +24,8 @@ import edu.wpi.first.wpilibj.tables.ITableListener;
 public class Parameters {
     private static final String TAG = "Parameters";
 
-    private static final String SAVE_FILE = "/storage/emulated/0/camerasettings.json";
-    private static final String PURPOSE_FILE = "/storage/emulated/0/purpose.txt";
+    private static String SAVE_FILE;
+    private static String PURPOSE_FILE;
 
     public enum Purpose {
         GEAR_LIFT("Vision_Gear", (byte) 0x93),
@@ -81,7 +83,9 @@ public class Parameters {
         }
     };
 
-    public static void initPurpose() {
+    public static void initPurpose(Context ctx) {
+        SAVE_FILE = Environment.getExternalStorageDirectory().getPath() + "/camerasettings.json";
+        PURPOSE_FILE = Environment.getExternalStorageDirectory().getPath() + "/purpose.txt";
         StringBuilder builder = new StringBuilder();
         try {
             FileReader reader = new FileReader(PURPOSE_FILE);

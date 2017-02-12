@@ -31,7 +31,6 @@ import erik.android.vision.visiontest_native.AppNative;
 public class Communications {
     static final String TAG = "Communications";
 
-    public static final String PERSISTENT_FILENAME = "/storage/emulated/0/networktables.ini";
     public static final String IDENTITY = "Android";
     public static final int CS_CONTROL_PORT = 5809;
     public static final int CS_STREAM_PORT = 5810;
@@ -50,13 +49,12 @@ public class Communications {
 
     protected static NetworkTable root;
 
-    public static void initNetworkTables() {
-        Parameters.initPurpose();
+    public static void initNetworkTables(Context ctx) {
+        Parameters.initPurpose(ctx);
 
         NetworkTable.setClientMode();
         NetworkTable.setNetworkIdentity(IDENTITY + "_" + Parameters.purpose.toString());
         NetworkTable.setIPAddress(ROBORIO_ADDRESS);
-        NetworkTable.setPersistentFilename(PERSISTENT_FILENAME);
         NetworkTable.initialize();
         Parameters.initDefaultVariables();
 
