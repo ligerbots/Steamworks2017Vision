@@ -42,10 +42,6 @@ public class Parameters {
     public static Purpose purpose;
 
     public static final double DEFAULT_CALIB_DOT_SPACING = 4.15625; // in
-    public static final double GEAR_TARGET_WIDTH = 10.25; // in
-    public static final double GEAR_TARGET_HEIGHT = 5.0; // in
-    public static final double BOILER_TARGET_WIDTH = 0.82 * 15; // in
-    public static final double BOILER_TARGET_HEIGHT = 6.0; // in
 
     public static final int MAX_PREVIEW_WIDTH = 1920;
     public static final int MAX_PREVIEW_HEIGHT = 1080;
@@ -112,27 +108,13 @@ public class Parameters {
         if(!calibTable.containsKey("squareSize"))
             calibTable.putNumber("squareSize", DEFAULT_CALIB_DOT_SPACING);
 
-        targetSizeTable = NetworkTable.getTable(purpose.visionTable + "/target");
-        if(!targetSizeTable.containsKey("width")) {
-            if (purpose == Purpose.BOILER) {
-                targetSizeTable.putNumber("width", BOILER_TARGET_WIDTH);
-            } else {
-                targetSizeTable.putNumber("width", GEAR_TARGET_WIDTH);
-            }
-        }
-        if(!targetSizeTable.containsKey("height")) {
-            if (purpose == Purpose.BOILER) {
-                targetSizeTable.putNumber("height", BOILER_TARGET_HEIGHT);
-            } else {
-                targetSizeTable.putNumber("height", GEAR_TARGET_WIDTH);
-            }
-        }
+        // target width and height handled by Robot
     }
 
     public static double[] getTargetSize() {
         return new double[]{
-                targetSizeTable.getNumber("width", GEAR_TARGET_WIDTH),
-                targetSizeTable.getNumber("height", GEAR_TARGET_HEIGHT)
+                targetSizeTable.getNumber("width", Double.NaN),
+                targetSizeTable.getNumber("height", Double.NaN)
         };
     }
 

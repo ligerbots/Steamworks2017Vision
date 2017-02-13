@@ -128,7 +128,7 @@ public class ImageProcessor implements Runnable {
 
                 if (found) {
                     Point[] polyFitPts = polyFit.toArray();
-                    Communications.root.putString("Image_Coords",String.format("%s%n%s%n%s%n%s",
+                    Communications.root.putString("Image_Coords", String.format("%s%n%s%n%s%n%s",
                             polyFitPts[0].toString(),
                             polyFitPts[1].toString(),
                             polyFitPts[2].toString(),
@@ -138,65 +138,69 @@ public class ImageProcessor implements Runnable {
                     MatOfPoint3f objPoints = new MatOfPoint3f();
                     double[] targetSize = Parameters.getTargetSize();
 
-                    objPoints.fromArray(
-                            new Point3(-targetSize[0] / 2, -targetSize[1] / 2, 0),
-                            new Point3(-targetSize[0] / 2, targetSize[1] / 2, 0),
-                            new Point3(targetSize[0] / 2, targetSize[1] / 2, 0),
-                            new Point3(targetSize[0] / 2, -targetSize[1] / 2, 0)
-                    );
-
-                    double[] cameraMatrixA = mCalibration.getCameraMatrixArray();
-                    double[] distortionCoefficientsA =
-                            mCalibration.getDistortionCoefficientsArray();
-
-                    if (cameraMatrixA.length > 0 && distortionCoefficientsA.length > 0) {
-                        Mat cameraMatrix = new Mat();
-                        MatOfDouble distortCoeff = new MatOfDouble();
-                        Mat.eye(3, 3, CvType.CV_64FC1).copyTo(cameraMatrix);
-                        cameraMatrix.put(0, 0, 1.0);
-                        Mat.zeros(5, 1, CvType.CV_64FC1).copyTo(distortCoeff);
-                        Mat rvec = new Mat(), tvec = new Mat();
-
-                        for (int i = 0; i < 3; i++) {
-                            for (int j = 0; j < 3; j++) {
-                                cameraMatrix.put(i, j, cameraMatrixA[i * 3 + j]);
-                            }
-                        }
-                        for (int i = 0; i < distortionCoefficientsA.length; i++) {
-                            distortCoeff.put(i, 0, distortionCoefficientsA[i]);
-                        }
-
-                        Calib3d.solvePnP(objPoints, polyFit, cameraMatrix, distortCoeff,
-                                rvec, tvec);
-
-                        Mat rmat = new Mat();
-
-                        Calib3d.Rodrigues(rvec, rmat);
-                        rvec.release();
-                        rvec = new Mat(1, 3, CvType.CV_64F);
-                        rvec.put(0, 0,
-                                Core.fastAtan2((float) rmat.get(1, 2)[0],
-                                        (float) rmat.get(2, 2)[0]),
-                                Core.fastAtan2((float) -rmat.get(2, 0)[0],
-                                        (float) Math.sqrt(rmat.get(1, 2)[0] * rmat.get(1, 2)[0]
-                                                + rmat.get(2, 2)[0] * rmat.get(2, 2)[0])),
-                                Core.fastAtan2((float) rmat.get(1, 0)[0],
-                                        (float) rmat.get(0, 0)[0])
+                    if (Double.isNaN(targetSize[0]) || Double.isNaN(targetSize[1])) {
+                        Communications.root.putString("Status", "Waiting for robot data");
+                    } else {
+                        objPoints.fromArray(
+                                new Point3(-targetSize[0] / 2, -targetSize[1] / 2, 0),
+                                new Point3(-targetSize[0] / 2, targetSize[1] / 2, 0),
+                                new Point3(targetSize[0] / 2, targetSize[1] / 2, 0),
+                                new Point3(targetSize[0] / 2, -targetSize[1] / 2, 0)
                         );
 
-                        double[] rvecDouble = new double[(int) rvec.total()];
-                        rvec.get(0, 0, rvecDouble);
-                        double[] tvecDouble = new double[(int) tvec.total()];
-                        tvec.get(0, 0, tvecDouble);
-                        result.putNumber("rvec_pitch", rvecDouble[0]);
-                        result.putNumber("rvec_yaw", rvecDouble[1]);
-                        result.putNumber("rvec_roll", rvecDouble[2]);
-                        result.putNumber("tvec_x", tvecDouble[0]);
-                        result.putNumber("tvec_y", tvecDouble[1]);
-                        result.putNumber("tvec_z", tvecDouble[2]);
-                        Communications.dataServerSendData(rvecDouble[0], rvecDouble[1],
-                                rvecDouble[2], tvecDouble[0], tvecDouble[1], tvecDouble[2]);
-                        Communications.root.putString("Status", "OK");
+                        double[] cameraMatrixA = mCalibration.getCameraMatrixArray();
+                        double[] distortionCoefficientsA =
+                                mCalibration.getDistortionCoefficientsArray();
+
+                        if (cameraMatrixA.length > 0 && distortionCoefficientsA.length > 0) {
+                            Mat cameraMatrix = new Mat();
+                            MatOfDouble distortCoeff = new MatOfDouble();
+                            Mat.eye(3, 3, CvType.CV_64FC1).copyTo(cameraMatrix);
+                            cameraMatrix.put(0, 0, 1.0);
+                            Mat.zeros(5, 1, CvType.CV_64FC1).copyTo(distortCoeff);
+                            Mat rvec = new Mat(), tvec = new Mat();
+
+                            for (int i = 0; i < 3; i++) {
+                                for (int j = 0; j < 3; j++) {
+                                    cameraMatrix.put(i, j, cameraMatrixA[i * 3 + j]);
+                                }
+                            }
+                            for (int i = 0; i < distortionCoefficientsA.length; i++) {
+                                distortCoeff.put(i, 0, distortionCoefficientsA[i]);
+                            }
+
+                            Calib3d.solvePnP(objPoints, polyFit, cameraMatrix, distortCoeff,
+                                    rvec, tvec);
+
+                            Mat rmat = new Mat();
+
+                            Calib3d.Rodrigues(rvec, rmat);
+                            rvec.release();
+                            rvec = new Mat(1, 3, CvType.CV_64F);
+                            rvec.put(0, 0,
+                                    Core.fastAtan2((float) rmat.get(1, 2)[0],
+                                            (float) rmat.get(2, 2)[0]),
+                                    Core.fastAtan2((float) -rmat.get(2, 0)[0],
+                                            (float) Math.sqrt(rmat.get(1, 2)[0] * rmat.get(1, 2)[0]
+                                                    + rmat.get(2, 2)[0] * rmat.get(2, 2)[0])),
+                                    Core.fastAtan2((float) rmat.get(1, 0)[0],
+                                            (float) rmat.get(0, 0)[0])
+                            );
+
+                            double[] rvecDouble = new double[(int) rvec.total()];
+                            rvec.get(0, 0, rvecDouble);
+                            double[] tvecDouble = new double[(int) tvec.total()];
+                            tvec.get(0, 0, tvecDouble);
+                            result.putNumber("rvec_pitch", rvecDouble[0]);
+                            result.putNumber("rvec_yaw", rvecDouble[1]);
+                            result.putNumber("rvec_roll", rvecDouble[2]);
+                            result.putNumber("tvec_x", tvecDouble[0]);
+                            result.putNumber("tvec_y", tvecDouble[1]);
+                            result.putNumber("tvec_z", tvecDouble[2]);
+                            Communications.dataServerSendData(rvecDouble[0], rvecDouble[1],
+                                    rvecDouble[2], tvecDouble[0], tvecDouble[1], tvecDouble[2]);
+                            Communications.root.putString("Status", "OK");
+                        }
                     }
                 }
 
