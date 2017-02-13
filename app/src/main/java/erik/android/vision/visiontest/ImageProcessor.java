@@ -196,6 +196,7 @@ public class ImageProcessor implements Runnable {
                         result.putNumber("tvec_z", tvecDouble[2]);
                         Communications.dataServerSendData(rvecDouble[0], rvecDouble[1],
                                 rvecDouble[2], tvecDouble[0], tvecDouble[1], tvecDouble[2]);
+                        Communications.root.putString("Status", "OK");
                     }
                 }
 
@@ -211,6 +212,7 @@ public class ImageProcessor implements Runnable {
                 Log.i(TAG, "Processing thread loop done");
             } catch (Throwable t) {
                 Log.e(TAG, "Processing thread error!", t);
+                Communications.root.putString("Status", "Crashed");
             }
         }
 
@@ -313,6 +315,7 @@ public class ImageProcessor implements Runnable {
 
         if (combinedContours.size() < 2) {
             Log.i(TAG, "No gear target found: not enough contours");
+            Communications.root.putString("Status", "<2 contours in frame");
             releaseList0(combinedContours);
             contourCopy.release();
             return false;
@@ -364,6 +367,7 @@ public class ImageProcessor implements Runnable {
                 }
             } else {
                 Log.i(TAG, "No gear target found: contours too small");
+                Communications.root.putString("Status", "contours too small");
                 releaseList0(combinedContours);
                 contourCopy.release();
                 return false;
@@ -392,6 +396,7 @@ public class ImageProcessor implements Runnable {
 
         if (e0 == null || e1 == null) {
             Log.i(TAG, "No gear target found: couldn't quad fit");
+            Communications.root.putString("Status", "failed to quad fit");
             releaseList0(combinedContours);
             contourCopy.release();
             c0.release();
@@ -438,6 +443,7 @@ public class ImageProcessor implements Runnable {
                 // screwed up calculations? Ignore it
                 if (Double.isNaN(intersectionX) || Double.isNaN(intersectionY)
                         || Double.isInfinite(intersectionX) || Double.isInfinite(intersectionY)) {
+                    Communications.root.putString("Status", "failed to correct missing corner");
                     releaseList0(combinedContours);
                     contourCopy.release();
                     c0.release();
@@ -488,6 +494,7 @@ public class ImageProcessor implements Runnable {
 
         if (contours.size() < 2) {
             contourCopy.release();
+            Communications.root.putString("Status", "<2 contours");
             return false;
         }
 
@@ -518,12 +525,14 @@ public class ImageProcessor implements Runnable {
 
         if (c0.area < 200 || c1.area < 200) {
             Log.i(TAG, "Didn't find correct size of targets");
+            Communications.root.putString("Status", "contours too small");
             return false;
         }
 
         double areaRatio = c1.area / c0.area;
         if (areaRatio < 0.40 || areaRatio > 0.60) {
             Log.i(TAG, "Didn't find correct pair of targets: " + areaRatio);
+            Communications.root.putString("Status", "bad area ratio");
             return false;
         }
 
@@ -537,6 +546,7 @@ public class ImageProcessor implements Runnable {
             double y = point.y;
             if (x < 2 || x > src.width() - 2 || y < 2 || y > src.height() - 2) {
                 Log.i(TAG, "Target clipped");
+                Communications.root.putString("Status", "clipped target");
                 return false;
             }
         }
