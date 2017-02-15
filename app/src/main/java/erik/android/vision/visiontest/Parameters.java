@@ -15,6 +15,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 
 import edu.wpi.first.wpilibj.networktables.NetworkTable;
+import edu.wpi.first.wpilibj.networktables.NetworkTablesJNI;
 import edu.wpi.first.wpilibj.tables.ITable;
 import edu.wpi.first.wpilibj.tables.ITableListener;
 
@@ -109,6 +110,7 @@ public class Parameters {
             calibTable.putNumber("squareSize", DEFAULT_CALIB_DOT_SPACING);
 
         // target width and height handled by Robot
+        targetSizeTable = NetworkTable.getTable(purpose.visionTable + "/target");
     }
 
     public static double[] getTargetSize() {

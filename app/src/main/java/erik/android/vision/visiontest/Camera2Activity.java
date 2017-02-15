@@ -289,6 +289,19 @@ public class Camera2Activity extends AppCompatActivity {
                 });
             }
         });
+        
+        new NTCommand(Parameters.purpose.visionTable + "/Reboot", "Reboot", new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Log.i(TAG, "Rebooting");
+                    Runtime.getRuntime().exec("su -c reboot");
+                } catch(Exception e) {
+                    Log.e(TAG, "Error rebooting", e);
+                }
+            }
+        });
+
         new NTCommand(Parameters.purpose.visionTable + "/TakeFrame", "TakeFrame", new Runnable() {
             @Override
             public void run() {
