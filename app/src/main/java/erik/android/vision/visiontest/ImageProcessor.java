@@ -94,6 +94,11 @@ public class ImageProcessor implements Runnable {
                 }
             }
         }
+
+        if (Parameters.purpose == Parameters.Purpose.BOILER) {
+            Core.transpose(drawingRgbMat, drawingRgbMat);
+            Core.flip(drawingRgbMat, drawingRgbMat, 1);
+        }
     }
 
     @Override
@@ -141,12 +146,21 @@ public class ImageProcessor implements Runnable {
                     if (Double.isNaN(targetSize[0]) || Double.isNaN(targetSize[1])) {
                         Communications.root.putString("Status", "Waiting for robot data");
                     } else {
-                        objPoints.fromArray(
-                                new Point3(-targetSize[0] / 2, -targetSize[1] / 2, 0),
-                                new Point3(-targetSize[0] / 2, targetSize[1] / 2, 0),
-                                new Point3(targetSize[0] / 2, targetSize[1] / 2, 0),
-                                new Point3(targetSize[0] / 2, -targetSize[1] / 2, 0)
-                        );
+                        if (Parameters.purpose == Parameters.Purpose.BOILER) {
+                            objPoints.fromArray(
+                                    new Point3( targetSize[1] / 2,  targetSize[0] / 2, 0),
+                                    new Point3(-targetSize[1] / 2,  targetSize[0] / 2, 0),
+                                    new Point3(-targetSize[1] / 2, -targetSize[0] / 2, 0),
+                                    new Point3( targetSize[1] / 2, -targetSize[0] / 2, 0)
+                            );
+                        } else {
+                            objPoints.fromArray(
+                                    new Point3(-targetSize[0] / 2, -targetSize[1] / 2, 0),
+                                    new Point3(-targetSize[0] / 2, targetSize[1] / 2, 0),
+                                    new Point3(targetSize[0] / 2, targetSize[1] / 2, 0),
+                                    new Point3(targetSize[0] / 2, -targetSize[1] / 2, 0)
+                            );
+                        }
 
                         double[] cameraMatrixA = mCalibration.getCameraMatrixArray();
                         double[] distortionCoefficientsA =
@@ -578,19 +592,19 @@ public class ImageProcessor implements Runnable {
         Comparator<Point> comp = new Comparator<Point>() {
             @Override
             public int compare(Point p0, Point p1) {
-                return Double.compare(-p0.y, -p1.y);
+                return Double.compare(-p0.x, -p1.x);
             }
         };
 
         Arrays.sort(box0, comp);
         Arrays.sort(box1, comp);
 
-        if (box0[0].x > box0[1].x) {
+        if (box0[0].y > box0[1].y) {
             Point tmp = box0[0];
             box0[0] = box0[1];
             box0[1] = tmp;
         }
-        if (box1[0].x > box1[1].x) {
+        if (box1[0].y > box1[1].y) {
             Point tmp = box1[0];
             box1[0] = box1[1];
             box1[1] = tmp;
