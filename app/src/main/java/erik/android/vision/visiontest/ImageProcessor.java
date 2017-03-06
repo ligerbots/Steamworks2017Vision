@@ -229,7 +229,9 @@ public class ImageProcessor implements Runnable {
                             tvec.get(0, 0, tvecDouble);
 
                             double imgCx = (polyFitPts[0].x + polyFitPts[1].x  + polyFitPts[2].x  + polyFitPts[3].x)/4;
+                            imgCx /= Parameters.CAPTURE_SIZE.getWidth();
                             double imgCy = (polyFitPts[0].y + polyFitPts[1].y  + polyFitPts[2].y  + polyFitPts[3].y)/4;
+                            imgCy /= Parameters.CAPTURE_SIZE.getHeight();
 
                             result.putNumber("rvec_pitch", rvecDouble[0]);
                             result.putNumber("rvec_yaw", rvecDouble[1]);
