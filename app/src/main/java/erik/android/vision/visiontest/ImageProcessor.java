@@ -34,6 +34,8 @@ public class ImageProcessor implements Runnable {
     private Thread mProcessingThread;
 
     private final Object mProcessingLock = new Object();
+    private final Object mWaitLock = new Object();
+    boolean enabled = false;
     private Mat mProcessingHsvMat;
     private MatOfPoint mProcessingLargestContour = null;
     private Point[] mProcessingPolyFit = null;
@@ -104,12 +106,29 @@ public class ImageProcessor implements Runnable {
         }
     }
 
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+        synchronized (mWaitLock) {
+            mWaitLock.notifyAll();
+        }
+    }
+
     @Override
     public void run() {
         //noinspection InfiniteLoopStatement
         while (true) {
             try {
                 Log.i(TAG, "Processing thread waiting");
+
+                if (!enabled) {
+                    synchronized (mWaitLock) {
+                        mWaitLock.wait(5000);
+                    }
+                    if(!enabled) {
+                        continue;
+                    }
+                }
+
                 synchronized (mProcessingLock) {
                     try {
                         mProcessingLock.wait();

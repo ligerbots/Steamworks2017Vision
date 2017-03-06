@@ -322,9 +322,9 @@ public class Camera2Activity extends AppCompatActivity {
                     @Override
                     public void run() {
                         if(value.equals(Boolean.TRUE)) {
-                            enableProcessing();
+                            mImageProcessor.setEnabled(true);
                         } else {
-                            enableLowPowerMode();
+                            mImageProcessor.setEnabled(false);
                         }
                     }
                 });
@@ -374,23 +374,8 @@ public class Camera2Activity extends AppCompatActivity {
     @Override
     public void onResume() {
         super.onResume();
-        if(Communications.root.getBoolean("enabled", false)) {
-            enableProcessing();
-        }
-    }
 
-    @Override
-    public void onPause() {
-        enableLowPowerMode();
-        super.onPause();
-    }
-
-    public void enableLowPowerMode() {
-        closeCamera();
-        stopBackgroundThread();
-    }
-
-    public void enableProcessing() {
+        mImageProcessor.setEnabled(Communications.root.getBoolean("enabled", false));
         startBackgroundThread();
 
         // When the screen is turned off and turned back on, the SurfaceTexture is already
@@ -402,6 +387,13 @@ public class Camera2Activity extends AppCompatActivity {
         } else {
             mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
         }
+    }
+
+    @Override
+    public void onPause() {
+        closeCamera();
+        stopBackgroundThread();
+        super.onPause();
     }
 
     private void setUpCameraOutputs(int width, int height) {
