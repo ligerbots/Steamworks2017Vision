@@ -548,11 +548,11 @@ public class ImageProcessor implements Runnable {
         }
 
         double areaRatio = c1.area / c0.area;
-        if (areaRatio < 0.40 || areaRatio > 0.60) {
-            Log.i(TAG, "Didn't find correct pair of targets: " + areaRatio);
-            Communications.root.putString("Status", "bad area ratio");
-            return false;
-        }
+//        if (areaRatio < 0.40 || areaRatio > 0.60) {
+//            Log.i(TAG, "Didn't find correct pair of targets: " + areaRatio);
+//            Communications.root.putString("Status", "bad area ratio");
+//            return false;
+//        }
 
         // check if the entire contour is reasonably within bounds, otherwise we risk garbage
         // values from a clipped target
