@@ -113,13 +113,14 @@ public class Communications {
     }
 
     public static void dataServerSendData(double rvec_0, double rvec_1, double rvec_2,
-                                          double tvec_0, double tvec_1, double tvec_2) {
+                                          double tvec_0, double tvec_1, double tvec_2,
+                                          double imgCx, double imgCy) {
         checkRoboRioAddress();
         if(roboRioDataAddress == null) {
             return;
         }
 
-        ByteBuffer packet = ByteBuffer.allocateDirect(Double.SIZE / 8 * 6 + 1);
+        ByteBuffer packet = ByteBuffer.allocateDirect(Double.SIZE / 8 * 8 + 1);
         packet.position(0);
         packet.put(Parameters.purpose.dataCode);
         packet.putDouble(rvec_0);
@@ -128,6 +129,8 @@ public class Communications {
         packet.putDouble(tvec_0);
         packet.putDouble(tvec_1);
         packet.putDouble(tvec_2);
+        packet.putDouble(imgCx);
+        packet.putDouble(imgCy);
         packet.position(0);
         try {
             udpCameraServerChannel.send(packet, roboRioDataAddress);

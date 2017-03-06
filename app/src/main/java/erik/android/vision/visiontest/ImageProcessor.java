@@ -98,6 +98,9 @@ public class ImageProcessor implements Runnable {
         if (Parameters.purpose == Parameters.Purpose.BOILER) {
             Core.transpose(drawingRgbMat, drawingRgbMat);
             Core.flip(drawingRgbMat, drawingRgbMat, 1);
+            Imgproc.line(drawingRgbMat, new Point(Parameters.CAPTURE_SIZE.getHeight() / 2, 0),
+                    new Point(Parameters.CAPTURE_SIZE.getHeight() / 2,
+                            Parameters.CAPTURE_SIZE.getWidth()), new Scalar(0, 255, 0));
         }
     }
 
@@ -205,14 +208,20 @@ public class ImageProcessor implements Runnable {
                             rvec.get(0, 0, rvecDouble);
                             double[] tvecDouble = new double[(int) tvec.total()];
                             tvec.get(0, 0, tvecDouble);
+
+                            double imgCx = (polyFitPts[0].x + polyFitPts[1].x  + polyFitPts[2].x  + polyFitPts[3].x)/4;
+                            double imgCy = (polyFitPts[0].y + polyFitPts[1].y  + polyFitPts[2].y  + polyFitPts[3].y)/4;
+
                             result.putNumber("rvec_pitch", rvecDouble[0]);
                             result.putNumber("rvec_yaw", rvecDouble[1]);
                             result.putNumber("rvec_roll", rvecDouble[2]);
                             result.putNumber("tvec_x", tvecDouble[0]);
                             result.putNumber("tvec_y", tvecDouble[1]);
                             result.putNumber("tvec_z", tvecDouble[2]);
+                            result.putNumber("img_cx", imgCx);
+                            result.putNumber("img_cy", imgCy);
                             Communications.dataServerSendData(rvecDouble[0], rvecDouble[1],
-                                    rvecDouble[2], tvecDouble[0], tvecDouble[1], tvecDouble[2]);
+                                    rvecDouble[2], tvecDouble[0], tvecDouble[1], tvecDouble[2], imgCx, imgCy);
                             Communications.root.putString("Status", "OK");
                         }
                     }
