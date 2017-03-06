@@ -257,6 +257,8 @@ public class Camera2Activity extends AppCompatActivity {
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON |
                 WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON);
+        getWindow().getAttributes().screenBrightness = 0;
+
         mTextureView = (AutoFitTextureView) findViewById(R.id.textureView);
 
         // get rid of those pesky "App has stopped" dialogs so we can restart on crashes
