@@ -323,10 +323,12 @@ public class Camera2Activity extends AppCompatActivity {
                 Camera2Activity.this.runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        if(value.equals(Boolean.TRUE)) {
-                            mImageProcessor.setEnabled(true);
-                        } else {
-                            mImageProcessor.setEnabled(false);
+                        if (mImageProcessor != null) {
+                            if (value.equals(Boolean.TRUE)) {
+                                mImageProcessor.setEnabled(true);
+                            } else {
+                                mImageProcessor.setEnabled(false);
+                            }
                         }
                     }
                 });
@@ -377,7 +379,9 @@ public class Camera2Activity extends AppCompatActivity {
     public void onResume() {
         super.onResume();
 
-        mImageProcessor.setEnabled(Communications.root.getBoolean("enabled", false));
+        if(mImageProcessor != null) {
+            mImageProcessor.setEnabled(Communications.root.getBoolean("enabled", false));
+        }
         startBackgroundThread();
 
         // When the screen is turned off and turned back on, the SurfaceTexture is already
@@ -438,6 +442,7 @@ public class Camera2Activity extends AppCompatActivity {
                 if(mCalibration == null) {
                     mCalibration = new Calibration(this, mRgbWidth, mRgbHeight);
                     mImageProcessor = new ImageProcessor(mCalibration);
+                    mImageProcessor.setEnabled(Communications.root.getBoolean("enabled", false));
                 }
 
                 // find camera info and send it to SmartDashboard
