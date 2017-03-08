@@ -1,6 +1,8 @@
 package erik.android.vision.visiontest;
 
+import android.app.Dialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.res.Configuration;
 import android.graphics.Matrix;
 import android.graphics.Point;
@@ -23,6 +25,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.support.annotation.NonNull;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.util.Range;
@@ -32,6 +35,7 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
@@ -348,6 +352,38 @@ public class Camera2Activity extends AppCompatActivity {
                 }
             }
         });
+
+        Button purposeButton = (Button) findViewById(R.id.purposeButton);
+        if (Parameters.purpose == Parameters.Purpose.BOILER) {
+            purposeButton.setText("Switch to gear");
+        } else {
+            purposeButton.setText("Switch to boiler");
+        }
+        purposeButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new AlertDialog.Builder(Camera2Activity.this)
+                        .setTitle("Switch purpose?")
+                        .setMessage("Switch purpose?")
+                        .setIcon(android.R.drawable.ic_dialog_alert)
+                        .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int whichButton) {
+                                String newPurposeString;
+                                if (Parameters.purpose == Parameters.Purpose.BOILER) {
+                                    newPurposeString = "gearlift";
+                                } else {
+                                    newPurposeString = "boiler";
+                                }
+                                Parameters.writePurpose(Camera2Activity.this, newPurposeString);
+                                // allow app to restart
+                                System.exit(0);
+                            }
+                        })
+                        .setNegativeButton(android.R.string.no, null).show();
+            }
+        });
+
 
         Log.i(TAG, "Phone info " + Build.MANUFACTURER + " " + Build.MODEL);
 

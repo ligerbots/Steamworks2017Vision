@@ -104,6 +104,18 @@ public class Parameters {
         }
     }
 
+    public static void writePurpose(Context ctx, String contents) {
+        SAVE_FILE = Environment.getExternalStorageDirectory().getPath() + "/camerasettings.json";
+        PURPOSE_FILE = Environment.getExternalStorageDirectory().getPath() + "/purpose.txt";
+        try {
+            FileWriter writer = new FileWriter(PURPOSE_FILE);
+            writer.write(contents);
+            writer.close();
+        } catch (Exception e) {
+            Log.e(TAG, "Error", e);
+        }
+    }
+
     public static void initDefaultVariables() {
         ITable calibTable = NetworkTable.getTable(purpose.visionTable + "/Calibration");
         if(!calibTable.containsKey("squareSize"))
