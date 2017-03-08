@@ -116,6 +116,8 @@ public class Camera2Activity extends AppCompatActivity {
     private EditText overrideAddr;
     private CheckBox overrideEnabled;
 
+    private boolean frontCamera;
+
     /**
      * Listener for when the display is ready. Opens the camera and configures displaying.
      * It's not really that important; I'm pretty sure the camera will still work without a visible
@@ -339,6 +341,31 @@ public class Camera2Activity extends AppCompatActivity {
             }
         }, true);
 
+        Communications.root.putBoolean("frontCamera", false);
+        frontCamera = false;
+        Communications.root.addTableListener("frontCamera", new ITableListener() {
+            @Override
+            public void valueChanged(ITable source, String key, final Object value, boolean isNew) {
+                boolean boolVal = (Boolean) value;
+                if (frontCamera != boolVal) {
+                    frontCamera = boolVal;
+                    Camera2Activity.this.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (mImageProcessor != null) {
+                                Log.i(TAG, "Received change");
+                                Log.i(TAG, "Deinit");
+                                deinitCamera();
+                                Log.i(TAG, "Init");
+                                initCamera();
+                                Log.i(TAG, "Done");
+                            }
+                        }
+                    });
+                }
+            }
+        }, false);
+
         overrideAddr = (EditText) findViewById(R.id.overrideAddr);
         overrideEnabled = (CheckBox) findViewById(R.id.overrideEnabled);
         overrideEnabled.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
@@ -411,15 +438,7 @@ public class Camera2Activity extends AppCompatActivity {
         Communications.closeCameraServer();
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-
-        if(mImageProcessor != null) {
-            mImageProcessor.setEnabled(Communications.root.getBoolean("enabled", false));
-        }
-        startBackgroundThread();
-
+    private void initCamera() {
         // When the screen is turned off and turned back on, the SurfaceTexture is already
         // available, and "onSurfaceTextureAvailable" will not be called. In that case, we can open
         // a camera and start preview from here (otherwise, we wait until the surface is ready in
@@ -431,9 +450,26 @@ public class Camera2Activity extends AppCompatActivity {
         }
     }
 
+    private void deinitCamera() {
+        closeCamera();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+
+        if(mImageProcessor != null) {
+            mImageProcessor.setEnabled(Communications.root.getBoolean("enabled", false));
+        }
+
+        startBackgroundThread();
+
+        initCamera();
+    }
+
     @Override
     public void onPause() {
-        closeCamera();
+        deinitCamera();
         stopBackgroundThread();
         super.onPause();
     }
@@ -447,15 +483,22 @@ public class Camera2Activity extends AppCompatActivity {
 
                 // We don't use a front facing camera
                 Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
-                if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
+
+                if (frontCamera && facing != null && facing == CameraCharacteristics.LENS_FACING_BACK) {
+                    continue;
+                } else if (!frontCamera && facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
                     continue;
                 }
+
+                Log.i(TAG, "Found camera facing correctly");
 
                 StreamConfigurationMap map = characteristics.get(
                         CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
                 if (map == null) {
                     continue;
                 }
+
+                Log.i(TAG, "Camera has stream config map");
 
                 List<Size> captureSizes =
                         Arrays.asList(map.getOutputSizes(Parameters.CAPTURE_FORMAT));
@@ -704,15 +747,23 @@ public class Camera2Activity extends AppCompatActivity {
 
                             try {
                                 // Auto focus should be continuous for camera preview.
-                                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
-                                        CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+                                if (!frontCamera) {
+                                    mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
+                                            CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
 
-                                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
-                                        CaptureRequest.CONTROL_AE_MODE_OFF);
-                                mPreviewRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME,
-                                        (long) Parameters.exposureTime.getValue());
-                                mPreviewRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY,
-                                        (int) Parameters.sensitivity.getValue());
+                                    mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
+                                            CaptureRequest.CONTROL_AE_MODE_OFF);
+                                    mPreviewRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME,
+                                            (long) Parameters.exposureTime.getValue());
+                                    mPreviewRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY,
+                                            (int) Parameters.sensitivity.getValue());
+                                } else {
+                                    mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
+                                            CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+
+                                    mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
+                                            CaptureRequest.CONTROL_AE_MODE_ON);
+                                }
 
                                 // Finally, we start displaying the camera preview.
                                 mPreviewRequest = mPreviewRequestBuilder.build();
@@ -738,12 +789,17 @@ public class Camera2Activity extends AppCompatActivity {
                                         public void run() {
                                             Log.i(TAG, "NT restart triggered");
                                             try {
-                                                mPreviewRequestBuilder.set(
-                                                        CaptureRequest.SENSOR_EXPOSURE_TIME,
-                                                        (long) Parameters.exposureTime.getValue());
-                                                mPreviewRequestBuilder.set(
-                                                        CaptureRequest.SENSOR_SENSITIVITY,
-                                                        (int) Parameters.sensitivity.getValue());
+                                                if (!frontCamera) {
+                                                    mPreviewRequestBuilder.set(
+                                                            CaptureRequest.SENSOR_EXPOSURE_TIME,
+                                                            (long) Parameters.exposureTime.getValue());
+                                                    mPreviewRequestBuilder.set(
+                                                            CaptureRequest.SENSOR_SENSITIVITY,
+                                                            (int) Parameters.sensitivity.getValue());
+                                                } else {
+                                                    mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
+                                                            CaptureRequest.CONTROL_AE_MODE_ON);
+                                                }
                                                 mPreviewRequest = mPreviewRequestBuilder.build();
                                                 mNeedsToRestartRepeatingCapture = true;
                                                 try {
