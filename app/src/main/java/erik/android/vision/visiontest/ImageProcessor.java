@@ -208,20 +208,20 @@ public class ImageProcessor implements Runnable {
                             Calib3d.solvePnP(objPoints, polyFit, cameraMatrix, distortCoeff,
                                     rvec, tvec);
 
-                            Mat rmat = new Mat();
-
-                            Calib3d.Rodrigues(rvec, rmat);
-                            rvec.release();
-                            rvec = new Mat(1, 3, CvType.CV_64F);
-                            rvec.put(0, 0,
-                                    Core.fastAtan2((float) rmat.get(1, 2)[0],
-                                            (float) rmat.get(2, 2)[0]),
-                                    Core.fastAtan2((float) -rmat.get(2, 0)[0],
-                                            (float) Math.sqrt(rmat.get(1, 2)[0] * rmat.get(1, 2)[0]
-                                                    + rmat.get(2, 2)[0] * rmat.get(2, 2)[0])),
-                                    Core.fastAtan2((float) rmat.get(1, 0)[0],
-                                            (float) rmat.get(0, 0)[0])
-                            );
+//                            Mat rmat = new Mat();
+//
+//                            Calib3d.Rodrigues(rvec, rmat);
+//                            rvec.release();
+//                            rvec = new Mat(1, 3, CvType.CV_64F);
+//                            rvec.put(0, 0,
+//                                    Core.fastAtan2((float) rmat.get(1, 2)[0],
+//                                            (float) rmat.get(2, 2)[0]),
+//                                    Core.fastAtan2((float) -rmat.get(2, 0)[0],
+//                                            (float) Math.sqrt(rmat.get(1, 2)[0] * rmat.get(1, 2)[0]
+//                                                    + rmat.get(2, 2)[0] * rmat.get(2, 2)[0])),
+//                                    Core.fastAtan2((float) rmat.get(1, 0)[0],
+//                                            (float) rmat.get(0, 0)[0])
+//                            );
 
                             double[] rvecDouble = new double[(int) rvec.total()];
                             rvec.get(0, 0, rvecDouble);
@@ -242,7 +242,9 @@ public class ImageProcessor implements Runnable {
                             result.putNumber("img_cx", imgCx);
                             result.putNumber("img_cy", imgCy);
                             Communications.dataServerSendData(rvecDouble[0], rvecDouble[1],
-                                    rvecDouble[2], tvecDouble[0], tvecDouble[1], tvecDouble[2], imgCx, imgCy);
+                                    rvecDouble[2], tvecDouble[0], tvecDouble[1], tvecDouble[2],
+                                    imgCx, imgCy,
+                                    polyFitPts[0], polyFitPts[1], polyFitPts[2], polyFitPts[3]);
                             Communications.root.putString("Status", "OK");
                         }
                     }

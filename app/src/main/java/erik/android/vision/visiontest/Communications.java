@@ -9,6 +9,7 @@ import android.util.Log;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfByte;
 import org.opencv.core.MatOfInt;
+import org.opencv.core.Point;
 import org.opencv.imgcodecs.Imgcodecs;
 
 import java.io.IOException;
@@ -114,13 +115,13 @@ public class Communications {
 
     public static void dataServerSendData(double rvec_0, double rvec_1, double rvec_2,
                                           double tvec_0, double tvec_1, double tvec_2,
-                                          double imgCx, double imgCy) {
+                                          double imgCx, double imgCy, Point p0, Point p1, Point p2, Point p3) {
         checkRoboRioAddress();
         if(roboRioDataAddress == null) {
             return;
         }
 
-        ByteBuffer packet = ByteBuffer.allocateDirect(Double.SIZE / 8 * 8 + 1);
+        ByteBuffer packet = ByteBuffer.allocateDirect(Double.SIZE / 8 * 16 + 1);
         packet.position(0);
         packet.put(Parameters.purpose.dataCode);
         packet.putDouble(rvec_0);
@@ -131,6 +132,14 @@ public class Communications {
         packet.putDouble(tvec_2);
         packet.putDouble(imgCx);
         packet.putDouble(imgCy);
+        packet.putDouble(p0.x);
+        packet.putDouble(p0.y);
+        packet.putDouble(p1.x);
+        packet.putDouble(p1.y);
+        packet.putDouble(p2.x);
+        packet.putDouble(p2.y);
+        packet.putDouble(p3.x);
+        packet.putDouble(p3.y);
         packet.position(0);
         try {
             udpCameraServerChannel.send(packet, roboRioDataAddress);
