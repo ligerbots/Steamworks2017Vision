@@ -233,12 +233,12 @@ public class ImageProcessor implements Runnable {
                             double imgCy = (polyFitPts[0].y + polyFitPts[1].y  + polyFitPts[2].y  + polyFitPts[3].y)/4;
                             imgCy /= Parameters.CAPTURE_SIZE.getHeight();
 
-                            result.putNumber("rvec_pitch", rvecDouble[0]);
-                            result.putNumber("rvec_yaw", rvecDouble[1]);
-                            result.putNumber("rvec_roll", rvecDouble[2]);
-                            result.putNumber("tvec_x", tvecDouble[0]);
-                            result.putNumber("tvec_y", tvecDouble[1]);
-                            result.putNumber("tvec_z", tvecDouble[2]);
+                            result.putNumber("rvec_0", rvecDouble[0]);
+                            result.putNumber("rvec_1", rvecDouble[1]);
+                            result.putNumber("rvec_2", rvecDouble[2]);
+                            result.putNumber("tvec_0", tvecDouble[0]);
+                            result.putNumber("tvec_1", tvecDouble[1]);
+                            result.putNumber("tvec_2", tvecDouble[2]);
                             result.putNumber("img_cx", imgCx);
                             result.putNumber("img_cy", imgCy);
                             Communications.dataServerSendData(rvecDouble[0], rvecDouble[1],
