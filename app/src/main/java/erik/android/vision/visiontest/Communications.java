@@ -62,10 +62,25 @@ public class Communications {
         root = NetworkTable.getTable(Parameters.purpose.visionTable);
     }
 
-    public static void reconnect(String newAddr) {
+    public static void reconnect(final String newAddr) {
         NetworkTable.shutdown();
         NetworkTable.setIPAddress(newAddr);
         NetworkTable.initialize();
+
+        if (newAddr.equals(ROBORIO_ADDRESS)) {
+            roboRioCameraStreamAddress = null;
+        } else {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        roboRioCameraStreamAddress = new InetSocketAddress(InetAddress.getByName(newAddr), CS_STREAM_PORT);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error resolving address", e);
+                    }
+                }
+            }).start();
+        }
     }
 
     public static void closeNetworkTables() {
@@ -118,6 +133,7 @@ public class Communications {
                                           double imgCx, double imgCy, Point p0, Point p1, Point p2, Point p3) {
         checkRoboRioAddress();
         if(roboRioDataAddress == null) {
+            Log.w(TAG, "Can't send data, address == null");
             return;
         }
 
@@ -142,6 +158,7 @@ public class Communications {
         packet.putDouble(p3.y);
         packet.position(0);
         try {
+            Log.d(TAG, "Sending to " + roboRioDataAddress.toString());
             udpCameraServerChannel.send(packet, roboRioDataAddress);
         } catch (IOException e) {
             e.printStackTrace();

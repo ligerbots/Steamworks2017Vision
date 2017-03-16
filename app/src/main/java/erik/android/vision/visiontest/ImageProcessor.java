@@ -30,6 +30,9 @@ import edu.wpi.first.wpilibj.networktables.NetworkTable;
 
 public class ImageProcessor implements Runnable {
     private static final String TAG = "ImageProcessor";
+    private static final int NO_TARGET = 0;
+    private static final int GEAR_TARGET = 1;
+    private static final int FEEDER_TARGET = 2;
 
     private Thread mProcessingThread;
 
@@ -147,10 +150,12 @@ public class ImageProcessor implements Runnable {
 
                 // Process gear lift
                 boolean found;
+                int code = NO_TARGET;
                 if (Parameters.purpose == Parameters.Purpose.BOILER) {
                     found = findBoilerTarget(mProcessingHsvMat);
                 } else {
-                    found = findGearTarget(mProcessingHsvMat);
+                    code = findGearTarget(mProcessingHsvMat);
+                    found = code != NO_TARGET;
                 }
 
                 if (found) {
@@ -175,12 +180,19 @@ public class ImageProcessor implements Runnable {
                                     new Point3(-targetSize[1] / 2, -targetSize[0] / 2, 0),
                                     new Point3( targetSize[1] / 2, -targetSize[0] / 2, 0)
                             );
-                        } else {
+                        } else if (code == GEAR_TARGET) {
                             objPoints.fromArray(
                                     new Point3(-targetSize[0] / 2, -targetSize[1] / 2, 0),
                                     new Point3(-targetSize[0] / 2, targetSize[1] / 2, 0),
                                     new Point3(targetSize[0] / 2, targetSize[1] / 2, 0),
                                     new Point3(targetSize[0] / 2, -targetSize[1] / 2, 0)
+                            );
+                        } else {
+                            objPoints.fromArray(
+                                    new Point3(-4 / 2, -5 / 2, 0),
+                                    new Point3(-4 / 2, 5 / 2, 0),
+                                    new Point3(4 / 2, 5 / 2, 0),
+                                    new Point3(4 / 2, -5 / 2, 0)
                             );
                         }
 
@@ -294,7 +306,7 @@ public class ImageProcessor implements Runnable {
         list.clear();
     }
 
-    private boolean findGearTarget(Mat src) {
+    private int findGearTarget(Mat src) {
         // filter out green
         Core.inRange(src, mFilterColorRange.getLower(),
                 mFilterColorRange.getUpper(), src);
@@ -363,12 +375,45 @@ public class ImageProcessor implements Runnable {
             }
         });
 
-        if (combinedContours.size() < 2) {
-            Log.i(TAG, "No gear target found: not enough contours");
-            Communications.root.putString("Status", "<2 contours in frame");
+        if (combinedContours.size() == 1) {
+            // feeder station
+            Log.i(TAG, "Detecting feeder station target");
+
+            MatOfPoint c0 = combinedContours.get(0).contour;
+            MatOfPoint2f d0 = new MatOfPoint2f();
+            c0.convertTo(d0, CvType.CV_32FC2);
+
+            MatOfPoint2f e0 = quadFit(d0);
+
+            if (e0 == null) {
+                Log.i(TAG, "No feeder target found: couldn't quad fit");
+                Communications.root.putString("Status", "failed to quad fit feeder");
+                releaseList0(combinedContours);
+                contourCopy.release();
+                c0.release();
+                d0.release();
+                return NO_TARGET;
+            }
+
+            reorderQuad(e0, true);
+            Point[] p0 = e0.toArray();
+            polyFit.fromArray(p0);
+
             releaseList0(combinedContours);
             contourCopy.release();
-            return false;
+            c0.release();
+            d0.release();
+            e0.release();
+            Communications.root.putString("Status", "got feeder target");
+            return FEEDER_TARGET;
+        }
+
+        if (combinedContours.size() < 2) {
+            Log.i(TAG, "No gear target found: not enough contours");
+            Communications.root.putString("Status", combinedContours.size() + " contours in frame");
+            releaseList0(combinedContours);
+            contourCopy.release();
+            return NO_TARGET;
         }
 
         // if there are 3 or more contours, detect the 2 closest to each other. These are likely
@@ -417,10 +462,10 @@ public class ImageProcessor implements Runnable {
                 }
             } else {
                 Log.i(TAG, "No gear target found: contours too small");
-                Communications.root.putString("Status", "contours too small");
+                Communications.root.putString("Status", combinedContours.size() + " contours too small");
                 releaseList0(combinedContours);
                 contourCopy.release();
-                return false;
+                return NO_TARGET;
             }
         }
 
@@ -455,7 +500,7 @@ public class ImageProcessor implements Runnable {
             d1.release();
             if (e0 != null) e0.release();
             if (e1 != null) e1.release();
-            return false;
+            return NO_TARGET;
         }
 
         // reorder clockwise from bottom left corner for left target, counterclockwise from bottom
@@ -502,7 +547,7 @@ public class ImageProcessor implements Runnable {
                     d1.release();
                     e0.release();
                     e1.release();
-                    return false;
+                    return NO_TARGET;
                 }
 
                 qCut[0].x = intersectionX;
@@ -527,7 +572,7 @@ public class ImageProcessor implements Runnable {
         e0.release();
         e1.release();
 
-        return true;
+        return GEAR_TARGET;
     }
 
     private boolean findBoilerTarget(Mat src) {
