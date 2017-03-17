@@ -52,6 +52,8 @@ public class ImageProcessor implements Runnable {
     private MatOfPoint2f polyFit = new MatOfPoint2f();
     List<MatOfPoint> contours = new LinkedList<>();
     Mat hierarchy = new Mat();
+    Mat overlaysGray = null;
+    Mat overlays = null;
 
     private NetworkTable result;
 
@@ -82,6 +84,10 @@ public class ImageProcessor implements Runnable {
                     //mCalibration.renderFrame(drawingRgbMat);
                 }
                 mProcessingLock.notify();
+            }
+
+            if (overlays != null) {
+                Core.addWeighted(drawingRgbMat, 0.5, overlays, 0.5, 1.0, drawingRgbMat);
             }
 
             if (mProcessingLargestContour != null) {
@@ -148,6 +154,18 @@ public class ImageProcessor implements Runnable {
                 // send image histogram
                 mFilterColorRange.setHistogram(mProcessingHsvMat);
 
+                // filter out green
+                Core.inRange(mProcessingHsvMat, mFilterColorRange.getLower(),
+                        mFilterColorRange.getUpper(), mProcessingHsvMat);
+
+                if (overlays == null) {
+                    overlays = new Mat(mProcessingHsvMat.rows(), mProcessingHsvMat.cols(), CvType.CV_8UC3);
+                    overlaysGray = new Mat(mProcessingHsvMat.rows(), mProcessingHsvMat.cols(), CvType.CV_8UC1);
+                }
+
+                mProcessingHsvMat.copyTo(overlaysGray);
+                Imgproc.cvtColor(overlaysGray, overlays, Imgproc.COLOR_GRAY2RGB);
+
                 // Process gear lift
                 boolean found;
                 int code = NO_TARGET;
@@ -189,10 +207,10 @@ public class ImageProcessor implements Runnable {
                             );
                         } else {
                             objPoints.fromArray(
-                                    new Point3(-4 / 2, -5 / 2, 0),
-                                    new Point3(-4 / 2, 5 / 2, 0),
-                                    new Point3(4 / 2, 5 / 2, 0),
-                                    new Point3(4 / 2, -5 / 2, 0)
+                                    new Point3(-4 / 2, -6 / 2, 0),
+                                    new Point3(-4 / 2, 6 / 2, 0),
+                                    new Point3(4 / 2, 6 / 2, 0),
+                                    new Point3(4 / 2, -6 / 2, 0)
                             );
                         }
 
@@ -307,10 +325,6 @@ public class ImageProcessor implements Runnable {
     }
 
     private int findGearTarget(Mat src) {
-        // filter out green
-        Core.inRange(src, mFilterColorRange.getLower(),
-                mFilterColorRange.getUpper(), src);
-
         // detect all contours
         Mat contourCopy = src.clone();
         Imgproc.findContours(contourCopy, contours, hierarchy, Imgproc.RETR_CCOMP,
@@ -576,10 +590,6 @@ public class ImageProcessor implements Runnable {
     }
 
     private boolean findBoilerTarget(Mat src) {
-        // filter out green
-        Core.inRange(src, mFilterColorRange.getLower(),
-                mFilterColorRange.getUpper(), src);
-
         releaseList(contours);
 
         // detect all contours
