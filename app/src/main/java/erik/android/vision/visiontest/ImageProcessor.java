@@ -206,11 +206,12 @@ public class ImageProcessor implements Runnable {
                                     new Point3(targetSize[0] / 2, -targetSize[1] / 2, 0)
                             );
                         } else {
+                            Log.i(TAG, "Fitting feeder target");
                             objPoints.fromArray(
-                                    new Point3(-4 / 2, -6 / 2, 0),
-                                    new Point3(-4 / 2, 6 / 2, 0),
-                                    new Point3(4 / 2, 6 / 2, 0),
-                                    new Point3(4 / 2, -6 / 2, 0)
+                                    new Point3(-2, -3, 0),
+                                    new Point3(-2, 3, 0),
+                                    new Point3(2, 3, 0),
+                                    new Point3(2, -3, 0)
                             );
                         }
 
@@ -275,7 +276,6 @@ public class ImageProcessor implements Runnable {
                                     rvecDouble[2], tvecDouble[0], tvecDouble[1], tvecDouble[2],
                                     imgCx, imgCy,
                                     polyFitPts[0], polyFitPts[1], polyFitPts[2], polyFitPts[3]);
-                            Communications.root.putString("Status", "OK");
                         }
                     }
                 }
@@ -369,11 +369,11 @@ public class ImageProcessor implements Runnable {
             MatOfPoint normalizedCombinedContour = normalizeHull(all, hullIdx);
 
             // check if the result is reasonably vertical
-            Rect boundingRect = Imgproc.boundingRect(normalizedCombinedContour);
-            if (((double) boundingRect.height) / boundingRect.width < 1.5) {
-                continue;
-            }
 
+//            Rect boundingRect = Imgproc.boundingRect(normalizedCombinedContour);
+//            if (((double) boundingRect.height) / boundingRect.width < 1.6) {
+//                continue;
+//            }
             hullIdx.release();
             all.release();
             double area = Imgproc.contourArea(normalizedCombinedContour);
@@ -585,7 +585,7 @@ public class ImageProcessor implements Runnable {
         d1.release();
         e0.release();
         e1.release();
-
+        Communications.root.putString("Status", "got gear target");
         return GEAR_TARGET;
     }
 
@@ -697,6 +697,7 @@ public class ImageProcessor implements Runnable {
             box1[1] = tmp;
         }
 
+        Communications.root.putString("Status", "got boiler target");
         polyFit.fromArray(box1[0], box0[0], box0[1], box1[1]);
         return true;
     }
