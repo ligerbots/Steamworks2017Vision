@@ -198,20 +198,13 @@ public class ImageProcessor implements Runnable {
                                     new Point3(-targetSize[1] / 2, -targetSize[0] / 2, 0),
                                     new Point3( targetSize[1] / 2, -targetSize[0] / 2, 0)
                             );
-                        } else if (code == GEAR_TARGET) {
+                        } else {
+                            Math.random();
                             objPoints.fromArray(
                                     new Point3(-targetSize[0] / 2, -targetSize[1] / 2, 0),
                                     new Point3(-targetSize[0] / 2, targetSize[1] / 2, 0),
                                     new Point3(targetSize[0] / 2, targetSize[1] / 2, 0),
                                     new Point3(targetSize[0] / 2, -targetSize[1] / 2, 0)
-                            );
-                        } else {
-                            Log.i(TAG, "Fitting feeder target");
-                            objPoints.fromArray(
-                                    new Point3(-2, -3, 0),
-                                    new Point3(-2, 3, 0),
-                                    new Point3(2, 3, 0),
-                                    new Point3(2, -3, 0)
                             );
                         }
 
