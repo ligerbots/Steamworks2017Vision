@@ -199,7 +199,6 @@ public class ImageProcessor implements Runnable {
                                     new Point3( targetSize[1] / 2, -targetSize[0] / 2, 0)
                             );
                         } else {
-                            Math.random();
                             objPoints.fromArray(
                                     new Point3(-targetSize[0] / 2, -targetSize[1] / 2, 0),
                                     new Point3(-targetSize[0] / 2, targetSize[1] / 2, 0),
@@ -367,9 +366,16 @@ public class ImageProcessor implements Runnable {
 //            if (((double) boundingRect.height) / boundingRect.width < 1.6) {
 //                continue;
 //            }
+
             hullIdx.release();
             all.release();
             double area = Imgproc.contourArea(normalizedCombinedContour);
+
+            if (area < 15.0) {
+                normalizedCombinedContour.release();
+                continue;
+            }
+
             System.out.println("new combined contour " + numSources + "/" + area);
             combinedContours.add(new ContourInfo(normalizedCombinedContour, area, numSources));
         }
@@ -381,6 +387,15 @@ public class ImageProcessor implements Runnable {
                 return (int) Math.signum(o2.area - o1.area);
             }
         });
+
+        StringBuilder info = new StringBuilder();
+        for (int i = 0; i < combinedContours.size(); i++) {
+            info.append(i);
+            info.append(": ");
+            info.append(combinedContours.get(i).area);
+            info.append('\n');
+        }
+        Communications.root.putString("Detection_Info", info.toString());
 
         if (combinedContours.size() == 1) {
             // feeder station
