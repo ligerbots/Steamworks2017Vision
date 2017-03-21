@@ -397,7 +397,17 @@ public class ImageProcessor implements Runnable {
         }
         Communications.root.putString("Detection_Info", info.toString());
 
-        if (combinedContours.size() == 1) {
+        boolean isFeeder = false;
+        if (combinedContours.size() > 1) {
+            double topTwoRatio = combinedContours.get(0).area / combinedContours.get(1).area;
+            if (topTwoRatio > 2.0) {
+                isFeeder = true;
+            }
+        } else if(combinedContours.size() == 1) {
+            isFeeder = true;
+        }
+
+        if (isFeeder) {
             // feeder station
             Log.i(TAG, "Detecting feeder station target");
 
