@@ -376,6 +376,13 @@ public class ImageProcessor implements Runnable {
                 continue;
             }
 
+            // reject reflection from gear
+            Point center = centerOfContour(normalizedCombinedContour);
+            if (center.y > Parameters.CAPTURE_SIZE.getHeight() * 0.8) {
+                normalizedCombinedContour.release();
+                continue;
+            }
+
             System.out.println("new combined contour " + numSources + "/" + area);
             combinedContours.add(new ContourInfo(normalizedCombinedContour, area, numSources));
         }
