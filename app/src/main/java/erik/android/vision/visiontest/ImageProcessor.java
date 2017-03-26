@@ -378,7 +378,7 @@ public class ImageProcessor implements Runnable {
 
             // reject reflection from gear
             Point center = centerOfContour(normalizedCombinedContour);
-            if (center.y > Parameters.CAPTURE_SIZE.getHeight() * 0.8) {
+            if (center.y > Parameters.CAPTURE_SIZE.getHeight() * 0.9) {
                 normalizedCombinedContour.release();
                 continue;
             }
